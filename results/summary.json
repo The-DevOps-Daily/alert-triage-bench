@@ -1,0 +1,603 @@
+{
+  "ref": "qwen3.8-max",
+  "alerts": 200,
+  "pageAlerts": 50,
+  "hardAlerts": 108,
+  "models": [
+    {
+      "model": "deepseek-v4-flash-0731",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 1,
+      "accuracyHard": 1,
+      "accuracyEasy": 1,
+      "missedPagesPerRun": 0,
+      "falsePagesPerRun": 0,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        }
+      ],
+      "wrongAlerts": 0,
+      "errorRateUpper95": 0.01486703923127203,
+      "missedPageAlerts": 0,
+      "missRateUpper95": 0.058155079116972326,
+      "allRunsAgree": 1,
+      "costPer1000": 0.15737843333333348,
+      "totalCost": 0.09442706000000008,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 4391,
+        "p95": 10728.849999999988,
+        "max": 60583
+      },
+      "outputTokens": {
+        "p50": 143,
+        "reasoningShare": 0.8065736172173479
+      },
+      "served": {
+        "deepseek-v4-flash-0731": 600
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "se": 0
+        },
+        "missedPageRate": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "se": 0
+        }
+      }
+    },
+    {
+      "model": "router:general",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 1,
+      "accuracyHard": 1,
+      "accuracyEasy": 1,
+      "missedPagesPerRun": 0,
+      "falsePagesPerRun": 0,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        }
+      ],
+      "wrongAlerts": 0,
+      "errorRateUpper95": 0.01486703923127203,
+      "missedPageAlerts": 0,
+      "missRateUpper95": 0.058155079116972326,
+      "allRunsAgree": 1,
+      "costPer1000": 1.565363866666666,
+      "totalCost": 0.9392183199999997,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 1763.5,
+        "p95": 3453.5999999999995,
+        "max": 13329
+      },
+      "outputTokens": {
+        "p50": 33,
+        "reasoningShare": 0.16215535691804103
+      },
+      "served": {
+        "qwen3.8-max": 571,
+        "deepseek-v4-flash-0731": 29
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "se": 0
+        },
+        "missedPageRate": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "se": 0
+        }
+      }
+    },
+    {
+      "model": "qwen3.8-max",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 1,
+      "accuracyHard": 1,
+      "accuracyEasy": 1,
+      "missedPagesPerRun": 0,
+      "falsePagesPerRun": 0,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        }
+      ],
+      "wrongAlerts": 0,
+      "errorRateUpper95": 0.01486703923127203,
+      "missedPageAlerts": 0,
+      "missRateUpper95": 0.058155079116972326,
+      "allRunsAgree": 1,
+      "costPer1000": 1.6404099999999986,
+      "totalCost": 0.9842459999999992,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 1274.5,
+        "p95": 2601.1499999999996,
+        "max": 6614
+      },
+      "outputTokens": {
+        "p50": 33,
+        "reasoningShare": 0
+      },
+      "served": {
+        "qwen3.8-max": 600
+      }
+    },
+    {
+      "model": "openai-gpt-oss-120b",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 1,
+      "accuracy": 0.9983333333333333,
+      "accuracyHard": 1,
+      "accuracyEasy": 0.9963768115942029,
+      "missedPagesPerRun": 0,
+      "falsePagesPerRun": 0,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 0.995,
+          "missedPages": 0,
+          "falsePages": 0
+        }
+      ],
+      "wrongAlerts": 1,
+      "errorRateUpper95": 0.023498470434950736,
+      "missedPageAlerts": 0,
+      "missRateUpper95": 0.058155079116972326,
+      "allRunsAgree": 0.995,
+      "costPer1000": 0.19365866666666678,
+      "totalCost": 0.11619520000000007,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 3106,
+        "p95": 5108.1,
+        "max": 7602
+      },
+      "outputTokens": {
+        "p50": 161,
+        "reasoningShare": 0
+      },
+      "served": {
+        "openai-gpt-oss-120b": 600
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": -0.0016666666666666668,
+          "lo": -0.005,
+          "hi": 0,
+          "se": 0.0016497457546527346
+        },
+        "missedPageRate": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "se": 0
+        }
+      }
+    },
+    {
+      "model": "llama-4-maverick",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 0.995,
+      "accuracyHard": 1,
+      "accuracyEasy": 0.9891304347826086,
+      "missedPagesPerRun": 1,
+      "falsePagesPerRun": 0,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 0.995,
+          "missedPages": 1,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 1,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 0.99,
+          "missedPages": 2,
+          "falsePages": 0
+        }
+      ],
+      "wrongAlerts": 2,
+      "errorRateUpper95": 0.031142599414083764,
+      "missedPageAlerts": 2,
+      "missRateUpper95": 0.12061415542204419,
+      "allRunsAgree": 0.99,
+      "costPer1000": 0.18922120000000023,
+      "totalCost": 0.11353272000000014,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 1934.5,
+        "p95": 3333.899999999999,
+        "max": 6270
+      },
+      "outputTokens": {
+        "p50": 20,
+        "reasoningShare": 0
+      },
+      "served": {
+        "llama-4-maverick": 600
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": -0.005,
+          "lo": -0.013333333333333334,
+          "hi": 0,
+          "se": 0.0037182349866611035
+        },
+        "missedPageRate": {
+          "mean": 0.02,
+          "lo": 0,
+          "hi": 0.05333333333333333,
+          "se": 0.014665430127255746
+        }
+      }
+    },
+    {
+      "model": "router:software-engineering",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 0.9933333333333333,
+      "accuracyHard": 0.9938271604938271,
+      "accuracyEasy": 0.9927536231884058,
+      "missedPagesPerRun": 0,
+      "falsePagesPerRun": 0.6666666666666666,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 0.995,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 0.995,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 0.99,
+          "missedPages": 0,
+          "falsePages": 2
+        }
+      ],
+      "wrongAlerts": 4,
+      "errorRateUpper95": 0.045180414994718754,
+      "missedPageAlerts": 0,
+      "missRateUpper95": 0.058155079116972326,
+      "allRunsAgree": 0.98,
+      "costPer1000": 0.33918669999999973,
+      "totalCost": 0.20351201999999985,
+      "unpricedCalls": 5,
+      "latencyMs": {
+        "p50": 4214.5,
+        "p95": 8872.699999999999,
+        "max": 17639
+      },
+      "outputTokens": {
+        "p50": 119.5,
+        "reasoningShare": 0.7497843075961238
+      },
+      "served": {
+        "deepseek-v4-flash-0731": 465,
+        "deepseek-4-flash": 72,
+        "qwen3.8-max": 63
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": -0.006666666666666667,
+          "lo": -0.013333333333333338,
+          "hi": -0.0016666666666666668,
+          "se": 0.0032810006683065764
+        },
+        "missedPageRate": {
+          "mean": 0,
+          "lo": 0,
+          "hi": 0,
+          "se": 0
+        }
+      }
+    },
+    {
+      "model": "openai-gpt-oss-20b",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 0.9916666666666667,
+      "accuracyHard": 0.9969135802469136,
+      "accuracyEasy": 0.9855072463768116,
+      "missedPagesPerRun": 1,
+      "falsePagesPerRun": 0,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 0.995,
+          "missedPages": 0,
+          "falsePages": 0
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 0.985,
+          "missedPages": 3,
+          "falsePages": 0
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 0.995,
+          "missedPages": 0,
+          "falsePages": 0
+        }
+      ],
+      "wrongAlerts": 5,
+      "errorRateUpper95": 0.051843339120290544,
+      "missedPageAlerts": 3,
+      "missRateUpper95": 0.1478371763641812,
+      "allRunsAgree": 0.975,
+      "costPer1000": 0.14371024999999987,
+      "totalCost": 0.08622614999999992,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 2359,
+        "p95": 5259.299999999996,
+        "max": 11399
+      },
+      "outputTokens": {
+        "p50": 199,
+        "reasoningShare": 0
+      },
+      "served": {
+        "openai-gpt-oss-20b": 600
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": -0.008333333333333335,
+          "lo": -0.016666666666666673,
+          "hi": -0.0016666666666666668,
+          "se": 0.003663022066812525
+        },
+        "missedPageRate": {
+          "mean": 0.02,
+          "lo": 0,
+          "hi": 0.04666666666666666,
+          "se": 0.011232064930142317
+        }
+      }
+    },
+    {
+      "model": "mistral-3-14B",
+      "calls": 600,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 0.8866666666666667,
+      "accuracyHard": 0.9104938271604939,
+      "accuracyEasy": 0.8586956521739131,
+      "missedPagesPerRun": 4.666666666666667,
+      "falsePagesPerRun": 6,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 0.895,
+          "missedPages": 6,
+          "falsePages": 4
+        },
+        {
+          "run": 2,
+          "n": 200,
+          "accuracy": 0.905,
+          "missedPages": 5,
+          "falsePages": 4
+        },
+        {
+          "run": 3,
+          "n": 200,
+          "accuracy": 0.86,
+          "missedPages": 3,
+          "falsePages": 10
+        }
+      ],
+      "wrongAlerts": 42,
+      "errorRateUpper95": 0.2629731231496654,
+      "missedPageAlerts": 8,
+      "missRateUpper95": 0.27022007752641264,
+      "allRunsAgree": 0.8,
+      "costPer1000": 0.14882500000000004,
+      "totalCost": 0.08929500000000003,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 812.5,
+        "p95": 1800.1999999999998,
+        "max": 3715
+      },
+      "outputTokens": {
+        "p50": 33,
+        "reasoningShare": 0
+      },
+      "served": {
+        "mistral-3-14B": 600
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": -0.11333333333333329,
+          "lo": -0.14833333333333332,
+          "hi": -0.08000000000000002,
+          "se": 0.016996470195632267
+        },
+        "missedPageRate": {
+          "mean": 0.09333333333333332,
+          "lo": 0.03333333333333333,
+          "hi": 0.16,
+          "se": 0.03269788004719044
+        }
+      }
+    },
+    {
+      "model": "baseline:severity-label",
+      "calls": 200,
+      "failed": 0,
+      "invalid": 0,
+      "accuracy": 0.51,
+      "accuracyHard": 0.09259259259259259,
+      "accuracyEasy": 1,
+      "missedPagesPerRun": 14,
+      "falsePagesPerRun": 39,
+      "perRun": [
+        {
+          "run": 1,
+          "n": 200,
+          "accuracy": 0.51,
+          "missedPages": 14,
+          "falsePages": 39
+        }
+      ],
+      "wrongAlerts": 98,
+      "errorRateUpper95": 0.5504594050355661,
+      "missedPageAlerts": 14,
+      "missRateUpper95": 0.4026173821894413,
+      "allRunsAgree": 0,
+      "costPer1000": 0,
+      "totalCost": 0,
+      "unpricedCalls": 0,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "outputTokens": {
+        "p50": 0,
+        "reasoningShare": 0
+      },
+      "served": {
+        "none": 200
+      },
+      "vsRef": {
+        "ref": "qwen3.8-max",
+        "accuracy": {
+          "mean": -0.49,
+          "lo": -0.56,
+          "hi": -0.42,
+          "se": 0.03550536668035288
+        },
+        "missedPageRate": {
+          "mean": 0.28,
+          "lo": 0.16,
+          "hi": 0.4,
+          "se": 0.06359217244629647
+        }
+      }
+    }
+  ]
+}

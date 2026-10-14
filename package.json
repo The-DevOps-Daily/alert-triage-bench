@@ -1,0 +1,17 @@
+{
+  "name": "alert-triage-bench",
+  "version": "1.0.0",
+  "description": "Page, ticket or ignore: does a cheap model on DigitalOcean Serverless Inference route alerts as well as the most expensive one, and what do the model routers pick?",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "alerts": "node scripts/01-generate-alerts.mjs",
+    "check-labels": "node scripts/02-check-labels.mjs",
+    "run": "node scripts/03-run-models.mjs",
+    "baseline": "node scripts/03b-baseline-severity.mjs",
+    "score": "node scripts/04-score.mjs"
+  }
+}

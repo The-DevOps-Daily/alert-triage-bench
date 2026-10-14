@@ -1,0 +1,39 @@
+{
+  "source": "https://docs.digitalocean.com/products/gradient-ai-platform/details/pricing/",
+  "checked": "2026-10-14",
+  "note": "USD per 1M tokens. Inference Router has no extra charge during public preview; a routed call is billed at the price of the model that served it. The router reports one serving model as 'deepseek-4-flash', which the price page does not list by that name; it is priced as DeepSeek V4 Flash.",
+  "models": {
+    "deepseek-v4-flash-0731": {
+      "in": 0.14,
+      "out": 0.28
+    },
+    "qwen3.8-max": {
+      "in": 2.0,
+      "out": 6.0
+    },
+    "openai-gpt-oss-20b": {
+      "in": 0.05,
+      "out": 0.45
+    },
+    "openai-gpt-oss-120b": {
+      "in": 0.1,
+      "out": 0.7
+    },
+    "deepseek-4-flash": {
+      "in": 0.14,
+      "out": 0.28
+    },
+    "mistral-3-14B": {
+      "in": 0.2,
+      "out": 0.2
+    },
+    "llama-4-maverick": {
+      "in": 0.25,
+      "out": 0.87
+    },
+    "gemma-4-31B-it": {
+      "in": 0.18,
+      "out": 0.5
+    }
+  }
+}

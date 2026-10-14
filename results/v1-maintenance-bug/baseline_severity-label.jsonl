@@ -1,0 +1,2 @@
+{"model": "baseline:severity-label", "run": 1, "id": "a027", "label": "ignore", "decision": "page", "served": "none", "status": 200, "attempts": 1, "ms": 0, "usage": {"in": 0, "out": 0, "reasoning": 0}, "cost": 0, "priced": true}
+{"model": "baseline:severity-label", "run": 1, "id": "a078", "label": "ignore", "decision": "page", "served": "none", "status": 200, "attempts": 1, "ms": 0, "usage": {"in": 0, "out": 0, "reasoning": 0}, "cost": 0, "priced": true}

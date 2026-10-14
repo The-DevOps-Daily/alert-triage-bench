@@ -1,0 +1,2933 @@
+Reading additional input from stdin...
+OpenAI Codex v0.153.4
+--------
+workdir: ./second-reader
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 01a13bfd-e93c-76d2-8fec-01596154617a
+--------
+user
+You are the second labeller for an alert triage dataset. Read POLICY.md and alerts.txt in this directory only; do not read any other file and do not run anything except cat/sed/rg to read those two files. Apply the policy to each of the 200 alerts and decide page, ticket or ignore. Work carefully through every alert. Output only lines in the exact format '<id> <decision>' (for example 'a001 page'), one per alert, in id order, 200 lines, between a line 'BEGIN LABELS' and a line 'END LABELS'. After END LABELS, list any alerts where the policy was genuinely ambiguous, one line each with the id and why.
+codex
+I’ll read the two files and apply the policy to all 200 alerts.
+
+exec
+/bin/bash -lc 'cat POLICY.md alerts.txt' in ./second-reader
+ succeeded in 4ms:
+# On-call routing policy
+
+Every alert gets exactly one decision: **page**, **ticket** or **ignore**.
+
+## Services
+
+Tier 1 (customer-facing): `checkout`, `payments`, `api-gateway`, `auth`, `search`, `storefront`.
+Tier 2 (internal): every other service, for example `ci-runners`, `admin-dashboard`, `reporting`, `email-digest`, `image-resizer`, `feature-flags`.
+
+## Page: wake someone now
+
+Page only when the alert is in **production** and there is customer impact now, or there will be within 1 hour:
+
+- a tier 1 service is down, or returns errors on more than 2% of requests for 5 minutes or more, or its p99 latency is above 2 seconds for 10 minutes or more
+- a tier 1 SLO burns its error budget at 14x or faster
+- a production database, cache or queue will run out of disk, memory or connections within 1 hour at the current rate
+- a public production TLS certificate expires in less than 24 hours
+- the production primary database is unreachable
+- a security detector reports confirmed unauthorized access in production
+
+## Ticket: fix it during business hours
+
+A real problem with no customer impact within the hour:
+
+- a tier 2 service in production is down or returning errors
+- a tier 1 problem below the page thresholds (for example 1.2% errors, p99 of 1.4 seconds, or an SLO burn below 14x)
+- capacity that runs out in more than 1 hour but less than 7 days
+- a TLS certificate that expires in 1 to 14 days
+- one pod, node or instance is failing while the service still serves traffic normally
+- a backup or scheduled job failed
+- a problem in staging that blocks a release
+
+## Ignore: no action
+
+- non-production environments (dev, sandbox, preview, staging), unless the alert says it blocks a release
+- the alert resolved by itself within 5 minutes and had no customer impact
+- informational alerts: heartbeats such as Watchdog, deploy notifications, autoscaling events
+- the service is in an active maintenance window
+- the target is decommissioned or is a known test target
+
+## Precedence
+
+An active maintenance window or a decommissioned target means **ignore**, even when the alert would otherwise page.
+The `severity` label is set by whoever wrote the alert rule. Treat it as a hint only and decide from the rules above.
+### a001
+status: firing
+labels: alertname=HighLatencyP99 env=production service=storefront severity=critical team=web
+summary: storefront p99 latency is 2.8s
+description: p99 request latency on storefront has been above 2s for 28 minutes. Current p99 2.8s, p50 0.79s.
+startsAt: 2026-10-05T20:57:00Z
+maintenance window: none
+
+### a002
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=storefront severity=warning team=web
+summary: Pod storefront-ebd is crash looping
+description: 1 of 4 storefront pods has restarted 18 times in the last hour (OOMKilled). The other 3 replicas are healthy and the service error ratio is 0.1%.
+startsAt: 2026-10-14T18:03:00Z
+maintenance window: none
+
+### a003
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 91.8% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 36 minutes.
+startsAt: 2026-10-10T05:38:00Z
+maintenance window: none
+
+### a004
+status: firing
+labels: alertname=HPAScaledUp env=production service=payments severity=info team=payments
+summary: payments scaled from 7 to 9 replicas
+description: The HorizontalPodAutoscaler for payments added replicas because CPU utilization reached 80% (target 70%). Latency and errors are normal.
+startsAt: 2026-10-20T05:20:00Z
+maintenance window: none
+
+### a005
+status: firing
+labels: alertname=EndpointDown env=production service=storefront severity=warning team=web
+summary: storefront health check failing from all probe locations
+description: Blackbox probe to https://storefront.internal/healthz has failed from 3 of 3 locations for 6 minutes. Last error: HTTP 503.
+startsAt: 2026-10-06T14:16:00Z
+maintenance window: none
+
+### a006
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-main severity=info team=platform
+summary: Nightly backup of postgres-main failed
+description: The nightly pg_basebackup job for postgres-main exited with code 1 (S3 upload timed out). The last successful backup was 30 hours ago.
+startsAt: 2026-10-16T22:50:00Z
+maintenance window: none
+
+### a007
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for shop.example.com expires in 16 hours
+description: The public certificate served on shop.example.com:443 expires in 16 hours. Automatic renewal has failed 3 times (last error: ACME DNS-01 challenge timed out).
+startsAt: 2026-10-08T19:37:00Z
+maintenance window: none
+
+### a008
+status: firing
+labels: alertname=EndpointDown env=production service=reporting severity=warning team=data
+summary: reporting health check failing from all probe locations
+description: Blackbox probe to https://reporting.internal/healthz has failed from 3 of 3 locations for 10 minutes. Last error: connection refused.
+startsAt: 2026-10-18T12:35:00Z
+maintenance window: none
+
+### a009
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=warning target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T03:21:00Z
+maintenance window: none
+
+### a010
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-orders severity=warning team=platform
+summary: Nightly backup of postgres-orders failed
+description: The nightly pg_basebackup job for postgres-orders exited with code 1 (authentication failed for the backup role). The last successful backup was 27 hours ago.
+startsAt: 2026-10-16T20:14:00Z
+maintenance window: none
+
+### a011
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=redis-sessions severity=critical team=platform
+summary: redis-sessions data volume 94.5% full
+description: The data volume on redis-sessions (cache) is 94.5% full and growing. Linear prediction over the last 30 minutes: full in 34 minutes.
+startsAt: 2026-10-07T14:04:00Z
+maintenance window: none
+
+### a012
+status: firing
+labels: alertname=CronJobFailed env=production service=search severity=warning team=discovery
+summary: CronJob monthly-invoice-export failed
+description: The Kubernetes CronJob monthly-invoice-export failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T13:18:00Z
+maintenance window: none
+
+### a013
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for shop.example.com expires in 15 hours
+description: The public certificate served on shop.example.com:443 expires in 15 hours. Automatic renewal has failed 3 times (last error: ACME DNS-01 challenge timed out).
+startsAt: 2026-10-08T12:38:00Z
+maintenance window: none
+
+### a014
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=storefront severity=info team=web
+summary: storefront 5xx ratio is 1.7%
+description: 5xx responses on storefront have been above the team alert threshold of 1% for 17 minutes. Current value 1.7%.
+startsAt: 2026-10-11T15:48:00Z
+maintenance window: none
+
+### a015
+status: firing
+labels: alertname=CronJobFailed env=production service=reporting severity=warning team=data
+summary: CronJob monthly-invoice-export failed
+description: The Kubernetes CronJob monthly-invoice-export failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T01:47:00Z
+maintenance window: none
+
+### a016
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 93.5% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 31 minutes.
+startsAt: 2026-10-10T00:16:00Z
+maintenance window: none
+
+### a017
+status: firing
+labels: alertname=HighErrorRate env=staging service=search severity=critical team=discovery
+summary: search 5xx ratio is 42.3% in staging
+description: 5xx responses on search in staging have been above 2% for 10 minutes. Current value 42.3%. No release is waiting on this environment.
+startsAt: 2026-10-20T23:16:00Z
+maintenance window: none
+
+### a018
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=critical team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 7 minutes. Replicas report replication lag growing. No failover has happened.
+startsAt: 2026-10-09T10:13:00Z
+maintenance window: none
+
+### a019
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T13:39:00Z
+maintenance window: none
+
+### a020
+status: firing
+labels: alertname=HighErrorRate env=sandbox service=auth severity=critical team=identity
+summary: auth 5xx ratio is 48.4% in sandbox
+description: 5xx responses on auth in sandbox have been above 2% for 19 minutes. Current value 48.4%. No release is waiting on this environment.
+startsAt: 2026-10-26T06:03:00Z
+maintenance window: none
+
+### a021
+status: firing
+labels: alertname=HPAScaledUp env=production service=storefront severity=info team=web
+summary: storefront scaled from 8 to 13 replicas
+description: The HorizontalPodAutoscaler for storefront added replicas because CPU utilization reached 74% (target 70%). Latency and errors are normal.
+startsAt: 2026-10-20T09:19:00Z
+maintenance window: none
+
+### a022
+status: firing
+labels: alertname=HighLatencyP99 env=production service=api-gateway severity=warning team=platform
+summary: api-gateway p99 latency is 1.1s
+description: p99 request latency on api-gateway has been above 1s for 22 minutes. Current p99 1.1s. Error ratio unchanged at 0.07%.
+startsAt: 2026-10-12T06:07:00Z
+maintenance window: none
+
+### a023
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=postgres-main severity=critical team=platform
+summary: postgres-main data volume 96.1% full
+description: The data volume on postgres-main (database) is 96.1% full and growing. Linear prediction over the last 30 minutes: full in 41 minutes.
+startsAt: 2026-10-07T15:09:00Z
+maintenance window: none
+
+### a024
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=api-gateway severity=warning team=platform
+summary: api-gateway availability SLO burning at 7.6x
+description: The 99.9% availability SLO for api-gateway is burning error budget at 7.6x over the last 6h. At this rate the monthly budget is gone in 95 hours.
+startsAt: 2026-10-13T02:07:00Z
+maintenance window: none
+
+### a025
+status: firing
+labels: alertname=CronJobFailed env=production service=reporting severity=critical team=data
+summary: CronJob search-reindex-nightly failed
+description: The Kubernetes CronJob search-reindex-nightly failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T18:37:00Z
+maintenance window: none
+
+### a026
+status: firing
+labels: alertname=HPAScaledUp env=production service=payments severity=info team=payments
+summary: payments scaled from 7 to 12 replicas
+description: The HorizontalPodAutoscaler for payments added replicas because CPU utilization reached 80% (target 70%). Latency and errors are normal.
+startsAt: 2026-10-20T06:45:00Z
+maintenance window: none
+
+### a027
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 4 minutes.
+startsAt: 2026-10-23T05:00:00Z
+maintenance window: active until 04:00 UTC, change CHG-4960 (major version upgrade of postgres-main)
+
+### a028
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-25 NotReady
+description: 1 of 19 worker nodes has been NotReady for 23 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T10:48:00Z
+maintenance window: none
+
+### a029
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for status.example.com expires in 2 days
+description: The public certificate served on status.example.com:443 expires in 2 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T08:15:00Z
+maintenance window: none
+
+### a030
+status: firing
+labels: alertname=EndpointDown env=staging service=api-gateway severity=warning team=platform
+summary: api-gateway health check failing in staging
+description: Blackbox probe to https://api-gateway.staging.internal/healthz has failed for 12 minutes. This blocks release 2026.10.8, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T02:44:00Z
+maintenance window: none
+
+### a031
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=rabbitmq-orders severity=warning team=platform
+summary: rabbitmq-orders data volume 89.6% full
+description: The data volume on rabbitmq-orders (queue) is filling. Linear prediction over the last 6 hours: full in 18 hours.
+startsAt: 2026-10-13T06:39:00Z
+maintenance window: none
+
+### a032
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-orders severity=info team=platform
+summary: Nightly backup of postgres-orders failed
+description: The nightly pg_basebackup job for postgres-orders exited with code 1 (S3 upload timed out). The last successful backup was 28 hours ago.
+startsAt: 2026-10-16T22:14:00Z
+maintenance window: none
+
+### a033
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=warning team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 4 minutes. Replicas report replication lag growing. No failover has happened.
+startsAt: 2026-10-09T06:54:00Z
+maintenance window: none
+
+### a034
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-main severity=warning team=platform
+summary: Nightly backup of postgres-main failed
+description: The nightly pg_basebackup job for postgres-main exited with code 1 (disk quota exceeded on the backup host). The last successful backup was 27 hours ago.
+startsAt: 2026-10-16T15:02:00Z
+maintenance window: none
+
+### a035
+status: firing
+labels: alertname=HighErrorRate env=production service=reporting severity=warning team=data
+summary: reporting 5xx ratio is 21.2%
+description: 5xx responses on reporting have been above 2% for 26 minutes. Current value 21.2% of 55 req/s.
+startsAt: 2026-10-10T09:58:00Z
+maintenance window: none
+
+### a036
+status: firing
+labels: alertname=CronJobFailed env=production service=reporting severity=critical team=data
+summary: CronJob sitemap-rebuild failed
+description: The Kubernetes CronJob sitemap-rebuild failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T11:49:00Z
+maintenance window: none
+
+### a037
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for status.example.com expires in 11 days
+description: The public certificate served on status.example.com:443 expires in 11 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T17:16:00Z
+maintenance window: none
+
+### a038
+status: firing
+labels: alertname=EndpointDown env=production service=checkout severity=warning team=payments
+summary: checkout health check failing from all probe locations
+description: Blackbox probe to https://checkout.internal/healthz has failed from 3 of 3 locations for 5 minutes. Last error: connection refused.
+startsAt: 2026-10-06T17:19:00Z
+maintenance window: none
+
+### a039
+status: firing
+labels: alertname=HighErrorRate env=production service=checkout severity=critical team=payments
+summary: checkout 5xx ratio is 4.4%
+description: 5xx responses on checkout have been above 2% for 15 minutes.
+startsAt: 2026-10-22T22:02:00Z
+maintenance window: active until 04:00 UTC, change CHG-4912 (checkout database migration)
+
+### a040
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=info team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: root account API call from an IP address never seen before (AS-unknown), confirmed by the detector with high confidence.
+startsAt: 2026-10-09T15:08:00Z
+maintenance window: none
+
+### a041
+status: firing
+labels: alertname=HighErrorRate env=sandbox service=storefront severity=warning team=web
+summary: storefront 5xx ratio is 26.7% in sandbox
+description: 5xx responses on storefront in sandbox have been above 2% for 18 minutes. Current value 26.7%. No release is waiting on this environment.
+startsAt: 2026-10-21T03:22:00Z
+maintenance window: none
+
+### a042
+status: firing
+labels: alertname=HighLatencyP99 env=production service=search severity=critical team=discovery
+summary: search p99 latency is 5.9s
+description: p99 request latency on search has been above 2s for 25 minutes. Current p99 5.9s, p50 0.47s.
+startsAt: 2026-10-06T00:59:00Z
+maintenance window: none
+
+### a043
+status: firing
+labels: alertname=HighErrorRate env=staging service=auth severity=critical team=identity
+summary: auth 5xx ratio is 19.4% in staging
+description: 5xx responses on auth in staging have been above 2% for 24 minutes. Current value 19.4%. No release is waiting on this environment.
+startsAt: 2026-10-25T19:58:00Z
+maintenance window: none
+
+### a044
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=info team=payments
+summary: payments availability SLO burning at 5.8x
+description: The 99.9% availability SLO for payments is burning error budget at 5.8x over the last 6h. At this rate the monthly budget is gone in 124 hours.
+startsAt: 2026-10-12T18:33:00Z
+maintenance window: none
+
+### a045
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=storefront severity=critical team=web
+summary: storefront 5xx ratio is 1.5%
+description: 5xx responses on storefront have been above the team alert threshold of 1% for 26 minutes. Current value 1.5%.
+startsAt: 2026-10-11T18:00:00Z
+maintenance window: none
+
+### a046
+status: firing
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check failing from all probe locations
+description: Blackbox probe to https://checkout.internal/healthz has failed from 3 of 3 locations for 8 minutes. Last error: HTTP 503.
+startsAt: 2026-10-06T10:27:00Z
+maintenance window: none
+
+### a047
+status: firing
+labels: alertname=CronJobFailed env=production service=search severity=info team=discovery
+summary: CronJob monthly-invoice-export failed
+description: The Kubernetes CronJob monthly-invoice-export failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T08:28:00Z
+maintenance window: none
+
+### a048
+status: firing
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check failing from all probe locations
+description: Blackbox probe to https://checkout.internal/healthz has failed from 3 of 3 locations for 14 minutes. Last error: connection refused.
+startsAt: 2026-10-06T09:49:00Z
+maintenance window: none
+
+### a049
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 93.7% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 42 minutes.
+startsAt: 2026-10-10T01:14:00Z
+maintenance window: none
+
+### a050
+status: firing
+labels: alertname=EndpointDown env=production service=image-resizer severity=warning team=web
+summary: image-resizer health check failing from all probe locations
+description: Blackbox probe to https://image-resizer.internal/healthz has failed from 3 of 3 locations for 16 minutes. Last error: HTTP 502.
+startsAt: 2026-10-19T04:21:00Z
+maintenance window: none
+
+### a051
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for status.example.com expires in 7 days
+description: The public certificate served on status.example.com:443 expires in 7 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T16:56:00Z
+maintenance window: none
+
+### a052
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-42 NotReady
+description: 1 of 9 worker nodes has been NotReady for 37 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T02:04:00Z
+maintenance window: none
+
+### a053
+status: resolved
+labels: alertname=EndpointDown env=production service=payments severity=warning team=payments
+summary: payments health check recovered
+description: The blackbox probe to https://payments.internal/healthz failed from 1 of 3 locations and recovered after 1 minutes. The service error ratio stayed at 0.03% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T01:10:00Z
+endsAt: 2026-10-22T01:11:00Z
+maintenance window: none
+
+### a054
+status: firing
+labels: alertname=HighLatencyP99 env=production service=search severity=critical team=discovery
+summary: search p99 latency is 4.7s
+description: p99 request latency on search has been above 2s for 15 minutes. Current p99 4.7s, p50 0.83s.
+startsAt: 2026-10-05T16:02:00Z
+maintenance window: none
+
+### a055
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=critical team=payments
+summary: payments availability SLO burning at 25.4x
+description: The 99.9% availability SLO for payments is burning error budget at 25.4x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 28 hours.
+startsAt: 2026-10-07T06:38:00Z
+maintenance window: none
+
+### a056
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=critical team=platform
+summary: kafka-broker-2 data volume 96.9% full
+description: The data volume on kafka-broker-2 (queue) is 96.9% full and growing. Linear prediction over the last 30 minutes: full in 39 minutes.
+startsAt: 2026-10-07T15:50:00Z
+maintenance window: none
+
+### a057
+status: firing
+labels: alertname=EndpointDown env=production service=payments-sandbox-2024 severity=warning decommissioned=true
+summary: payments-sandbox-2024 health check failing from all probe locations
+description: Blackbox probe to https://payments-sandbox-2024.internal/healthz has failed from 3 of 3 locations for 105 minutes. The target was decommissioned on 2026-09-20 and its probe was never removed.
+startsAt: 2026-10-23T12:24:00Z
+maintenance window: none
+
+### a058
+status: resolved
+labels: alertname=EndpointDown env=production service=api-gateway severity=warning team=platform
+summary: api-gateway health check recovered
+description: The blackbox probe to https://api-gateway.internal/healthz failed from 1 of 3 locations and recovered after 3 minutes. The service error ratio stayed at 0.05% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T06:35:00Z
+endsAt: 2026-10-22T06:38:00Z
+maintenance window: none
+
+### a059
+status: firing
+labels: alertname=PostgresConnectionsNearLimit env=production service=postgres-main severity=critical team=platform
+summary: postgres-main at 465 of 500 connections
+description: postgres-main is using 465 of max_connections=500. Connections have grown steadily for 2 hours; at the current rate the limit is reached in about 33 minutes.
+startsAt: 2026-10-08T03:48:00Z
+maintenance window: none
+
+### a060
+status: firing
+labels: alertname=EndpointDown env=production service=search-v1-legacy severity=critical decommissioned=true
+summary: search-v1-legacy health check failing from all probe locations
+description: Blackbox probe to https://search-v1-legacy.internal/healthz has failed from 3 of 3 locations for 149 minutes. The target was decommissioned on 2026-09-30 and its probe was never removed.
+startsAt: 2026-10-24T00:10:00Z
+maintenance window: none
+
+### a061
+status: firing
+labels: alertname=HighLatencyP99 env=production service=storefront severity=warning team=web
+summary: storefront p99 latency is 1.3s
+description: p99 request latency on storefront has been above 1s for 33 minutes. Current p99 1.3s. Error ratio unchanged at 0.21%.
+startsAt: 2026-10-12T06:58:00Z
+maintenance window: none
+
+### a062
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-orders severity=warning team=platform
+summary: Nightly backup of postgres-orders failed
+description: The nightly pg_basebackup job for postgres-orders exited with code 1 (disk quota exceeded on the backup host). The last successful backup was 25 hours ago.
+startsAt: 2026-10-16T12:00:00Z
+maintenance window: none
+
+### a063
+status: firing
+labels: alertname=HighLatencyP99 env=production service=auth severity=warning team=identity
+summary: auth p99 latency is 1.5s
+description: p99 request latency on auth has been above 1s for 20 minutes. Current p99 1.5s. Error ratio unchanged at 0.06%.
+startsAt: 2026-10-12T09:36:00Z
+maintenance window: none
+
+### a064
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=info team=payments
+summary: payments availability SLO burning at 2.7x
+description: The 99.9% availability SLO for payments is burning error budget at 2.7x over the last 6h. At this rate the monthly budget is gone in 267 hours.
+startsAt: 2026-10-12T23:51:00Z
+maintenance window: none
+
+### a065
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for pay.example.com expires in 8 hours
+description: The public certificate served on pay.example.com:443 expires in 8 hours. Automatic renewal has failed 3 times (last error: ACME DNS-01 challenge timed out).
+startsAt: 2026-10-08T13:31:00Z
+maintenance window: none
+
+### a066
+status: firing
+labels: alertname=HighErrorRate env=production service=email-digest severity=warning team=growth
+summary: email-digest 5xx ratio is 15.3%
+description: 5xx responses on email-digest have been above 2% for 7 minutes. Current value 15.3% of 93 req/s.
+startsAt: 2026-10-11T03:02:00Z
+maintenance window: none
+
+### a067
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T11:47:00Z
+maintenance window: none
+
+### a068
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=redis-sessions severity=critical team=platform
+summary: redis-sessions data volume 96.8% full
+description: The data volume on redis-sessions (cache) is 96.8% full and growing. Linear prediction over the last 30 minutes: full in 48 minutes.
+startsAt: 2026-10-07T09:51:00Z
+maintenance window: none
+
+### a069
+status: firing
+labels: alertname=HighErrorRate env=preview service=search severity=warning team=discovery
+summary: search 5xx ratio is 21.8% in preview
+description: 5xx responses on search in preview have been above 2% for 37 minutes. Current value 21.8%. No release is waiting on this environment.
+startsAt: 2026-10-25T18:41:00Z
+maintenance window: none
+
+### a070
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=info team=platform
+summary: kafka-broker-2 data volume 85.1% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 12 hours.
+startsAt: 2026-10-13T14:47:00Z
+maintenance window: none
+
+### a071
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-36 NotReady
+description: 1 of 8 worker nodes has been NotReady for 28 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-15T21:24:00Z
+maintenance window: none
+
+### a072
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=search severity=critical team=discovery
+summary: search availability SLO burning at 25.6x
+description: The 99.9% availability SLO for search is burning error budget at 25.6x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 28 hours.
+startsAt: 2026-10-06T21:51:00Z
+maintenance window: none
+
+### a073
+status: firing
+labels: alertname=EndpointDown env=production service=payments-sandbox-2024 severity=critical decommissioned=true
+summary: payments-sandbox-2024 health check failing from all probe locations
+description: Blackbox probe to https://payments-sandbox-2024.internal/healthz has failed from 3 of 3 locations for 409 minutes. The target was decommissioned on 2026-09-30 and its probe was never removed.
+startsAt: 2026-10-23T23:45:00Z
+maintenance window: none
+
+### a074
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=critical team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: root account API call from an IP address never seen before (AS-unknown), confirmed by the detector with high confidence.
+startsAt: 2026-10-09T20:51:00Z
+maintenance window: none
+
+### a075
+status: resolved
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check recovered
+description: The blackbox probe to https://checkout.internal/healthz failed from 1 of 3 locations and recovered after 1 minutes. The service error ratio stayed at 0.08% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-21T16:36:00Z
+endsAt: 2026-10-21T16:37:00Z
+maintenance window: none
+
+### a076
+status: firing
+labels: alertname=HighLatencyP99 env=production service=search severity=warning team=discovery
+summary: search p99 latency is 1.7s
+description: p99 request latency on search has been above 1s for 40 minutes. Current p99 1.7s. Error ratio unchanged at 0.29%.
+startsAt: 2026-10-12T01:43:00Z
+maintenance window: none
+
+### a077
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=warning team=payments
+summary: payments availability SLO burning at 2.7x
+description: The 99.9% availability SLO for payments is burning error budget at 2.7x over the last 6h. At this rate the monthly budget is gone in 267 hours.
+startsAt: 2026-10-12T23:31:00Z
+maintenance window: none
+
+### a078
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=critical team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 7 minutes.
+startsAt: 2026-10-23T05:35:00Z
+maintenance window: active until 05:00 UTC, change CHG-4200 (major version upgrade of postgres-orders)
+
+### a079
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=auth severity=info team=identity
+summary: auth availability SLO burning at 2.9x
+description: The 99.9% availability SLO for auth is burning error budget at 2.9x over the last 6h. At this rate the monthly budget is gone in 248 hours.
+startsAt: 2026-10-13T06:17:00Z
+maintenance window: none
+
+### a080
+status: firing
+labels: alertname=EndpointDown env=staging service=storefront severity=info team=web
+summary: storefront health check failing in staging
+description: Blackbox probe to https://storefront.staging.internal/healthz has failed for 24 minutes. This blocks release 2026.10.6, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T10:46:00Z
+maintenance window: none
+
+### a081
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=payments severity=warning team=payments
+summary: Pod payments-4a6 is crash looping
+description: 1 of 8 payments pods has restarted 22 times in the last hour (OOMKilled). The other 7 replicas are healthy and the service error ratio is 0.02%.
+startsAt: 2026-10-15T08:05:00Z
+maintenance window: none
+
+### a082
+status: firing
+labels: alertname=HighErrorRate env=production service=ci-runners severity=warning team=platform
+summary: ci-runners 5xx ratio is 6.9%
+description: 5xx responses on ci-runners have been above 2% for 32 minutes. Current value 6.9% of 95 req/s.
+startsAt: 2026-10-11T06:22:00Z
+maintenance window: none
+
+### a083
+status: firing
+labels: alertname=EndpointDown env=production service=reporting severity=warning team=data
+summary: reporting health check failing from all probe locations
+description: Blackbox probe to https://reporting.internal/healthz has failed from 3 of 3 locations for 11 minutes. Last error: timeout after 10s.
+startsAt: 2026-10-19T01:30:00Z
+maintenance window: none
+
+### a084
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=checkout severity=info team=payments
+summary: checkout 5xx ratio is 1.7%
+description: 5xx responses on checkout have been above the team alert threshold of 1% for 24 minutes. Current value 1.7%.
+startsAt: 2026-10-12T00:05:00Z
+maintenance window: none
+
+### a085
+status: resolved
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check recovered
+description: The blackbox probe to https://checkout.internal/healthz failed from 1 of 3 locations and recovered after 4 minutes. The service error ratio stayed at 0.04% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-21T17:17:00Z
+endsAt: 2026-10-21T17:21:00Z
+maintenance window: none
+
+### a086
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T09:30:00Z
+maintenance window: none
+
+### a087
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=payments severity=warning team=payments
+summary: Pod payments-1840 is crash looping
+description: 1 of 5 payments pods has restarted 16 times in the last hour (OOMKilled). The other 4 replicas are healthy and the service error ratio is 0.03%.
+startsAt: 2026-10-15T11:42:00Z
+maintenance window: none
+
+### a088
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for docs.example.com expires in 10 days
+description: The public certificate served on docs.example.com:443 expires in 10 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T02:41:00Z
+maintenance window: none
+
+### a089
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=warning team=platform
+summary: Certificate for sandbox.example.dev expires in 15 hours
+description: The certificate served on sandbox.example.dev:443 expires in 15 hours. Only internal testers use this host.
+startsAt: 2026-10-24T22:00:00Z
+maintenance window: none
+
+### a090
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-main severity=info team=platform
+summary: Nightly backup of postgres-main failed
+description: The nightly pg_basebackup job for postgres-main exited with code 1 (authentication failed for the backup role). The last successful backup was 30 hours ago.
+startsAt: 2026-10-16T16:46:00Z
+maintenance window: none
+
+### a091
+status: resolved
+labels: alertname=EndpointDown env=production service=auth severity=warning team=identity
+summary: auth health check recovered
+description: The blackbox probe to https://auth.internal/healthz failed from 1 of 3 locations and recovered after 2 minutes. The service error ratio stayed at 0.06% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T02:05:00Z
+endsAt: 2026-10-22T02:07:00Z
+maintenance window: none
+
+### a092
+status: firing
+labels: alertname=HighErrorRate env=production service=email-digest severity=critical team=growth
+summary: email-digest 5xx ratio is 13.6%
+description: 5xx responses on email-digest have been above 2% for 22 minutes. Current value 13.6% of 63 req/s.
+startsAt: 2026-10-10T18:03:00Z
+maintenance window: none
+
+### a093
+status: resolved
+labels: alertname=EndpointDown env=production service=search severity=warning team=discovery
+summary: search health check recovered
+description: The blackbox probe to https://search.internal/healthz failed from 1 of 3 locations and recovered after 4 minutes. The service error ratio stayed at 0.04% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-21T22:07:00Z
+endsAt: 2026-10-21T22:11:00Z
+maintenance window: none
+
+### a094
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=search severity=warning team=discovery
+summary: Pod search-1478 is crash looping
+description: 1 of 4 search pods has restarted 24 times in the last hour (OOMKilled). The other 3 replicas are healthy and the service error ratio is 0.09%.
+startsAt: 2026-10-15T00:36:00Z
+maintenance window: none
+
+### a095
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 91.6% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 25 minutes.
+startsAt: 2026-10-10T01:55:00Z
+maintenance window: none
+
+### a096
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=critical team=platform
+summary: Certificate for sandbox.example.dev expires in 15 hours
+description: The certificate served on sandbox.example.dev:443 expires in 15 hours. Only internal testers use this host.
+startsAt: 2026-10-24T04:38:00Z
+maintenance window: none
+
+### a097
+status: firing
+labels: alertname=HPAScaledUp env=production service=auth severity=info team=identity
+summary: auth scaled from 6 to 10 replicas
+description: The HorizontalPodAutoscaler for auth added replicas because CPU utilization reached 82% (target 70%). Latency and errors are normal.
+startsAt: 2026-10-20T03:58:00Z
+maintenance window: none
+
+### a098
+status: firing
+labels: alertname=EndpointDown env=production service=feature-flags severity=warning team=platform
+summary: feature-flags health check failing from all probe locations
+description: Blackbox probe to https://feature-flags.internal/healthz has failed from 3 of 3 locations for 4 minutes. Last error: HTTP 502.
+startsAt: 2026-10-18T13:39:00Z
+maintenance window: none
+
+### a099
+status: firing
+labels: alertname=HighErrorRate env=production service=search severity=critical team=discovery
+summary: search 5xx ratio is 7.1%
+description: 5xx responses on search have been above 2% for 7 minutes. Current value 7.1% of 1,916 req/s.
+startsAt: 2026-10-05T10:27:00Z
+maintenance window: none
+
+### a100
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=api-gateway severity=critical team=platform
+summary: api-gateway 5xx ratio is 1.9%
+description: 5xx responses on api-gateway have been above the team alert threshold of 1% for 11 minutes. Current value 1.9%.
+startsAt: 2026-10-11T08:06:00Z
+maintenance window: none
+
+### a101
+status: firing
+labels: alertname=EndpointDown env=staging service=checkout severity=warning team=payments
+summary: checkout health check failing in staging
+description: Blackbox probe to https://checkout.staging.internal/healthz has failed for 39 minutes. This blocks release 2026.10.8, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T11:30:00Z
+maintenance window: none
+
+### a102
+status: firing
+labels: alertname=HighErrorRate env=dev service=storefront severity=warning team=web
+summary: storefront 5xx ratio is 37.5% in dev
+description: 5xx responses on storefront in dev have been above 2% for 23 minutes. Current value 37.5%. No release is waiting on this environment.
+startsAt: 2026-10-20T19:34:00Z
+maintenance window: none
+
+### a103
+status: firing
+labels: alertname=CronJobFailed env=production service=search severity=warning team=discovery
+summary: CronJob search-reindex-nightly failed
+description: The Kubernetes CronJob search-reindex-nightly failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T14:57:00Z
+maintenance window: none
+
+### a104
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=warning team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: an interactive shell was opened inside a payments pod by an unknown process; runtime detector verdict: confirmed intrusion.
+startsAt: 2026-10-09T12:26:00Z
+maintenance window: none
+
+### a105
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 7 minutes.
+startsAt: 2026-10-22T18:37:00Z
+maintenance window: active until 05:00 UTC, change CHG-4715 (major version upgrade of postgres-main)
+
+### a106
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T17:40:00Z
+maintenance window: none
+
+### a107
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=search severity=warning team=discovery
+summary: search 5xx ratio is 1.5%
+description: 5xx responses on search have been above the team alert threshold of 1% for 18 minutes. Current value 1.5%.
+startsAt: 2026-10-11T21:43:00Z
+maintenance window: none
+
+### a108
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=warning team=platform
+summary: Certificate for sandbox.example.dev expires in 13 hours
+description: The certificate served on sandbox.example.dev:443 expires in 13 hours. Only internal testers use this host.
+startsAt: 2026-10-24T03:17:00Z
+maintenance window: none
+
+### a109
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=warning team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 8 minutes. Replicas report replication lag growing. No failover has happened.
+startsAt: 2026-10-08T23:41:00Z
+maintenance window: none
+
+### a110
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T07:22:00Z
+maintenance window: none
+
+### a111
+status: firing
+labels: alertname=HighErrorRate env=preview service=search severity=critical team=discovery
+summary: search 5xx ratio is 47.3% in preview
+description: 5xx responses on search in preview have been above 2% for 25 minutes. Current value 47.3%. No release is waiting on this environment.
+startsAt: 2026-10-26T01:29:00Z
+maintenance window: none
+
+### a112
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=checkout severity=warning team=payments
+summary: Pod checkout-15f8 is crash looping
+description: 1 of 6 checkout pods has restarted 25 times in the last hour (OOMKilled). The other 5 replicas are healthy and the service error ratio is 0.2%.
+startsAt: 2026-10-14T22:43:00Z
+maintenance window: none
+
+### a113
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-23 NotReady
+description: 1 of 19 worker nodes has been NotReady for 25 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T08:18:00Z
+maintenance window: none
+
+### a114
+status: firing
+labels: alertname=CronJobFailed env=production service=reporting severity=info team=data
+summary: CronJob monthly-invoice-export failed
+description: The Kubernetes CronJob monthly-invoice-export failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T06:18:00Z
+maintenance window: none
+
+### a115
+status: resolved
+labels: alertname=EndpointDown env=production service=auth severity=warning team=identity
+summary: auth health check recovered
+description: The blackbox probe to https://auth.internal/healthz failed from 1 of 3 locations and recovered after 4 minutes. The service error ratio stayed at 0.09% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T10:30:00Z
+endsAt: 2026-10-22T10:34:00Z
+maintenance window: none
+
+### a116
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T09:34:00Z
+maintenance window: none
+
+### a117
+status: firing
+labels: alertname=EndpointDown env=production service=admin-dashboard severity=info team=backoffice
+summary: admin-dashboard health check failing from all probe locations
+description: Blackbox probe to https://admin-dashboard.internal/healthz has failed from 3 of 3 locations for 23 minutes. Last error: connection refused.
+startsAt: 2026-10-18T17:48:00Z
+maintenance window: none
+
+### a118
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 8 minutes.
+startsAt: 2026-10-23T00:09:00Z
+maintenance window: active until 05:00 UTC, change CHG-4728 (major version upgrade of postgres-main)
+
+### a119
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for status.example.com expires in 9 days
+description: The public certificate served on status.example.com:443 expires in 9 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T12:11:00Z
+maintenance window: none
+
+### a120
+status: firing
+labels: alertname=HighErrorRate env=production service=storefront severity=critical team=web
+summary: storefront 5xx ratio is 4.4%
+description: 5xx responses on storefront have been above 2% for 6 minutes. Current value 4.4% of 2,571 req/s.
+startsAt: 2026-10-05T08:30:00Z
+maintenance window: none
+
+### a121
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=dev service=edge severity=critical team=platform
+summary: Certificate for dev.example.dev expires in 2 hours
+description: The certificate served on dev.example.dev:443 expires in 2 hours. Only internal testers use this host.
+startsAt: 2026-10-24T18:47:00Z
+maintenance window: none
+
+### a122
+status: firing
+labels: alertname=EndpointDown env=production service=payments severity=critical team=payments
+summary: payments health check failing from all probe locations
+description: Blackbox probe to https://payments.internal/healthz has failed from 3 of 3 locations for 13 minutes. Last error: timeout after 10s.
+startsAt: 2026-10-06T08:48:00Z
+maintenance window: none
+
+### a123
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T06:07:00Z
+maintenance window: none
+
+### a124
+status: firing
+labels: alertname=EndpointDown env=staging service=storefront severity=warning team=web
+summary: storefront health check failing in staging
+description: Blackbox probe to https://storefront.staging.internal/healthz has failed for 46 minutes. This blocks release 2026.10.3, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T08:55:00Z
+maintenance window: none
+
+### a125
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=warning team=payments
+summary: payments availability SLO burning at 2.3x
+description: The 99.9% availability SLO for payments is burning error budget at 2.3x over the last 6h. At this rate the monthly budget is gone in 313 hours.
+startsAt: 2026-10-12T15:09:00Z
+maintenance window: none
+
+### a126
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for shop.example.com expires in 6 days
+description: The public certificate served on shop.example.com:443 expires in 6 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T14:14:00Z
+maintenance window: none
+
+### a127
+status: firing
+labels: alertname=EndpointDown env=production service=storefront-old severity=warning decommissioned=true
+summary: storefront-old health check failing from all probe locations
+description: Blackbox probe to https://storefront-old.internal/healthz has failed from 3 of 3 locations for 102 minutes. The target was decommissioned on 2026-09-28 and its probe was never removed.
+startsAt: 2026-10-23T18:50:00Z
+maintenance window: none
+
+### a128
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=checkout severity=critical team=payments
+summary: checkout availability SLO burning at 17.8x
+description: The 99.9% availability SLO for checkout is burning error budget at 17.8x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 40 hours.
+startsAt: 2026-10-07T00:38:00Z
+maintenance window: none
+
+### a129
+status: firing
+labels: alertname=HighErrorRate env=production service=search severity=critical team=discovery
+summary: search 5xx ratio is 4.4%
+description: 5xx responses on search have been above 2% for 11 minutes. Current value 4.4% of 1,611 req/s.
+startsAt: 2026-10-05T05:45:00Z
+maintenance window: none
+
+### a130
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=warning team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: an interactive shell was opened inside a payments pod by an unknown process; runtime detector verdict: confirmed intrusion.
+startsAt: 2026-10-09T15:54:00Z
+maintenance window: none
+
+### a131
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 93.7% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 26 minutes.
+startsAt: 2026-10-10T05:07:00Z
+maintenance window: none
+
+### a132
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=warning team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 7 minutes.
+startsAt: 2026-10-22T17:03:00Z
+maintenance window: active until 05:00 UTC, change CHG-4281 (major version upgrade of postgres-orders)
+
+### a133
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=search severity=warning team=discovery
+summary: Pod search-ad1 is crash looping
+description: 1 of 8 search pods has restarted 21 times in the last hour (OOMKilled). The other 7 replicas are healthy and the service error ratio is 0.16%.
+startsAt: 2026-10-15T03:41:00Z
+maintenance window: none
+
+### a134
+status: firing
+labels: alertname=EndpointDown env=production service=feature-flags severity=warning team=platform
+summary: feature-flags health check failing from all probe locations
+description: Blackbox probe to https://feature-flags.internal/healthz has failed from 3 of 3 locations for 26 minutes. Last error: connection refused.
+startsAt: 2026-10-18T21:14:00Z
+maintenance window: none
+
+### a135
+status: firing
+labels: alertname=HighLatencyP99 env=production service=payments severity=warning team=payments
+summary: payments p99 latency is 1.3s
+description: p99 request latency on payments has been above 1s for 29 minutes. Current p99 1.3s. Error ratio unchanged at 0.14%.
+startsAt: 2026-10-12T13:27:00Z
+maintenance window: none
+
+### a136
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=warning team=platform
+summary: kafka-broker-2 data volume 89.2% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 11 hours.
+startsAt: 2026-10-13T22:19:00Z
+maintenance window: none
+
+### a137
+status: firing
+labels: alertname=HighErrorRate env=preview service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 46.2% in preview
+description: 5xx responses on checkout in preview have been above 2% for 17 minutes. Current value 46.2%. No release is waiting on this environment.
+startsAt: 2026-10-21T07:28:00Z
+maintenance window: none
+
+### a138
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-12 NotReady
+description: 1 of 14 worker nodes has been NotReady for 36 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-15T18:58:00Z
+maintenance window: none
+
+### a139
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T11:57:00Z
+maintenance window: none
+
+### a140
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=critical team=platform
+summary: Node worker-46 NotReady
+description: 1 of 22 worker nodes has been NotReady for 40 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T06:02:00Z
+maintenance window: none
+
+### a141
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=checkout severity=critical team=payments
+summary: checkout availability SLO burning at 4.6x
+description: The 99.9% availability SLO for checkout is burning error budget at 4.6x over the last 6h. At this rate the monthly budget is gone in 157 hours.
+startsAt: 2026-10-12T16:21:00Z
+maintenance window: none
+
+### a142
+status: firing
+labels: alertname=EndpointDown env=production service=admin-dashboard severity=critical team=backoffice
+summary: admin-dashboard health check failing from all probe locations
+description: Blackbox probe to https://admin-dashboard.internal/healthz has failed from 3 of 3 locations for 27 minutes. Last error: HTTP 502.
+startsAt: 2026-10-18T18:30:00Z
+maintenance window: none
+
+### a143
+status: firing
+labels: alertname=HighLatencyP99 env=production service=checkout severity=warning team=payments
+summary: checkout p99 latency is 1.2s
+description: p99 request latency on checkout has been above 1s for 26 minutes. Current p99 1.2s. Error ratio unchanged at 0.15%.
+startsAt: 2026-10-12T04:41:00Z
+maintenance window: none
+
+### a144
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=api-gateway severity=critical team=platform
+summary: api-gateway availability SLO burning at 36.1x
+description: The 99.9% availability SLO for api-gateway is burning error budget at 36.1x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 20 hours.
+startsAt: 2026-10-07T01:36:00Z
+maintenance window: none
+
+### a145
+status: firing
+labels: alertname=DeploymentRolledOut env=production service=search severity=info team=discovery
+summary: search rolled out version 170
+description: Deployment search finished rolling out: 7 of 3 pods updated and ready.
+startsAt: 2026-10-20T01:32:00Z
+maintenance window: none
+
+### a146
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=warning team=platform
+summary: Certificate for sandbox.example.dev expires in 13 hours
+description: The certificate served on sandbox.example.dev:443 expires in 13 hours. Only internal testers use this host.
+startsAt: 2026-10-24T14:01:00Z
+maintenance window: none
+
+### a147
+status: firing
+labels: alertname=HighErrorRate env=production service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 6.4%
+description: 5xx responses on checkout have been above 2% for 7 minutes.
+startsAt: 2026-10-22T17:33:00Z
+maintenance window: active until 05:00 UTC, change CHG-4932 (checkout database migration)
+
+### a148
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=postgres-main severity=warning team=platform
+summary: postgres-main data volume 84.3% full
+description: The data volume on postgres-main (database) is filling. Linear prediction over the last 6 hours: full in 2.3 days.
+startsAt: 2026-10-13T17:28:00Z
+maintenance window: none
+
+### a149
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=warning team=platform
+summary: kafka-broker-2 data volume 86.9% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 2.5 days.
+startsAt: 2026-10-13T11:51:00Z
+maintenance window: none
+
+### a150
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for pay.example.com expires in 7 hours
+description: The public certificate served on pay.example.com:443 expires in 7 hours. Automatic renewal has failed 3 times (last error: ACME DNS-01 challenge timed out).
+startsAt: 2026-10-08T11:52:00Z
+maintenance window: none
+
+### a151
+status: firing
+labels: alertname=EndpointDown env=staging service=checkout severity=info team=payments
+summary: checkout health check failing in staging
+description: Blackbox probe to https://checkout.staging.internal/healthz has failed for 46 minutes. This blocks release 2026.10.2, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T07:08:00Z
+maintenance window: none
+
+### a152
+status: firing
+labels: alertname=DeploymentRolledOut env=production service=api-gateway severity=info team=platform
+summary: api-gateway rolled out version 153
+description: Deployment api-gateway finished rolling out: 9 of 10 pods updated and ready.
+startsAt: 2026-10-19T16:50:00Z
+maintenance window: none
+
+### a153
+status: firing
+labels: alertname=DeploymentRolledOut env=production service=storefront severity=info team=web
+summary: storefront rolled out version 259
+description: Deployment storefront finished rolling out: 9 of 3 pods updated and ready.
+startsAt: 2026-10-19T21:39:00Z
+maintenance window: none
+
+### a154
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=payments severity=info team=payments
+summary: payments 5xx ratio is 1.7%
+description: 5xx responses on payments have been above the team alert threshold of 1% for 14 minutes. Current value 1.7%.
+startsAt: 2026-10-11T11:47:00Z
+maintenance window: none
+
+### a155
+status: firing
+labels: alertname=HighErrorRate env=production service=storefront severity=warning team=web
+summary: storefront 5xx ratio is 2.9%
+description: 5xx responses on storefront have been above 2% for 8 minutes. Current value 2.9% of 2,631 req/s.
+startsAt: 2026-10-05T01:10:00Z
+maintenance window: none
+
+### a156
+status: firing
+labels: alertname=PostgresConnectionsNearLimit env=production service=postgres-main severity=critical team=platform
+summary: postgres-main at 480 of 500 connections
+description: postgres-main is using 480 of max_connections=500. Connections have grown steadily for 2 hours; at the current rate the limit is reached in about 34 minutes.
+startsAt: 2026-10-08T06:14:00Z
+maintenance window: none
+
+### a157
+status: firing
+labels: alertname=EndpointDown env=staging service=storefront severity=info team=web
+summary: storefront health check failing in staging
+description: Blackbox probe to https://storefront.staging.internal/healthz has failed for 19 minutes. This blocks release 2026.10.8, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T02:21:00Z
+maintenance window: none
+
+### a158
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-main severity=warning team=platform
+summary: Nightly backup of postgres-main failed
+description: The nightly pg_basebackup job for postgres-main exited with code 1 (disk quota exceeded on the backup host). The last successful backup was 27 hours ago.
+startsAt: 2026-10-17T00:43:00Z
+maintenance window: none
+
+### a159
+status: firing
+labels: alertname=PostgresConnectionsNearLimit env=production service=postgres-orders severity=critical team=platform
+summary: postgres-orders at 384 of 400 connections
+description: postgres-orders is using 384 of max_connections=400. Connections have grown steadily for 2 hours; at the current rate the limit is reached in about 24 minutes.
+startsAt: 2026-10-08T02:25:00Z
+maintenance window: none
+
+### a160
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=dev service=edge severity=warning team=platform
+summary: Certificate for dev.example.dev expires in 9 hours
+description: The certificate served on dev.example.dev:443 expires in 9 hours. Only internal testers use this host.
+startsAt: 2026-10-24T06:57:00Z
+maintenance window: none
+
+### a161
+status: firing
+labels: alertname=HighLatencyP99 env=production service=search severity=warning team=discovery
+summary: search p99 latency is 3.8s
+description: p99 request latency on search has been above 2s for 25 minutes. Current p99 3.8s, p50 0.77s.
+startsAt: 2026-10-05T13:43:00Z
+maintenance window: none
+
+### a162
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=warning team=platform
+summary: kafka-broker-2 data volume 83.9% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 14 hours.
+startsAt: 2026-10-13T21:45:00Z
+maintenance window: none
+
+### a163
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-48 NotReady
+description: 1 of 12 worker nodes has been NotReady for 23 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-15T15:45:00Z
+maintenance window: none
+
+### a164
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=warning team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: an interactive shell was opened inside a payments pod by an unknown process; runtime detector verdict: confirmed intrusion.
+startsAt: 2026-10-09T17:53:00Z
+maintenance window: none
+
+### a165
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=critical team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 4 minutes. Replicas report replication lag growing. No failover has happened.
+startsAt: 2026-10-09T02:46:00Z
+maintenance window: none
+
+### a166
+status: firing
+labels: alertname=EndpointDown env=staging service=checkout severity=critical team=payments
+summary: checkout health check failing in staging
+description: Blackbox probe to https://checkout.staging.internal/healthz has failed for 20 minutes. This blocks release 2026.10.9, which is waiting on the staging smoke tests.
+startsAt: 2026-10-17T22:10:00Z
+maintenance window: none
+
+### a167
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=storefront severity=info team=web
+summary: storefront availability SLO burning at 37.6x
+description: The 99.9% availability SLO for storefront is burning error budget at 37.6x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 19 hours.
+startsAt: 2026-10-07T03:27:00Z
+maintenance window: none
+
+### a168
+status: firing
+labels: alertname=HighErrorRate env=staging service=checkout severity=critical team=payments
+summary: checkout 5xx ratio is 29.9% in staging
+description: 5xx responses on checkout in staging have been above 2% for 12 minutes. Current value 29.9%. No release is waiting on this environment.
+startsAt: 2026-10-21T12:01:00Z
+maintenance window: none
+
+### a169
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=redis-sessions severity=warning team=platform
+summary: redis-sessions data volume 93.4% full
+description: The data volume on redis-sessions (cache) is 93.4% full and growing. Linear prediction over the last 30 minutes: full in 26 minutes.
+startsAt: 2026-10-07T19:47:00Z
+maintenance window: none
+
+### a170
+status: firing
+labels: alertname=HighErrorRate env=dev service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 49% in dev
+description: 5xx responses on checkout in dev have been above 2% for 23 minutes. Current value 49%. No release is waiting on this environment.
+startsAt: 2026-10-26T08:08:00Z
+maintenance window: none
+
+### a171
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 1.3%
+description: 5xx responses on checkout have been above the team alert threshold of 1% for 31 minutes. Current value 1.3%.
+startsAt: 2026-10-11T15:25:00Z
+maintenance window: none
+
+### a172
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=dev service=edge severity=warning team=platform
+summary: Certificate for dev.example.dev expires in 5 hours
+description: The certificate served on dev.example.dev:443 expires in 5 hours. Only internal testers use this host.
+startsAt: 2026-10-25T02:30:00Z
+maintenance window: none
+
+### a173
+status: firing
+labels: alertname=EndpointDown env=production service=auth-v1 severity=warning decommissioned=true
+summary: auth-v1 health check failing from all probe locations
+description: Blackbox probe to https://auth-v1.internal/healthz has failed from 3 of 3 locations for 179 minutes. The target was decommissioned on 2026-09-27 and its probe was never removed.
+startsAt: 2026-10-23T17:15:00Z
+maintenance window: none
+
+### a174
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=preview service=edge severity=critical team=platform
+summary: Certificate for preview.example.dev expires in 18 hours
+description: The certificate served on preview.example.dev:443 expires in 18 hours. Only internal testers use this host.
+startsAt: 2026-10-24T10:32:00Z
+maintenance window: none
+
+### a175
+status: firing
+labels: alertname=HighErrorRate env=sandbox service=search severity=warning team=discovery
+summary: search 5xx ratio is 18.7% in sandbox
+description: 5xx responses on search in sandbox have been above 2% for 13 minutes. Current value 18.7%. No release is waiting on this environment.
+startsAt: 2026-10-20T16:54:00Z
+maintenance window: none
+
+### a176
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 7 minutes. Replicas report replication lag growing. No failover has happened.
+startsAt: 2026-10-09T04:26:00Z
+maintenance window: none
+
+### a177
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 3 minutes.
+startsAt: 2026-10-22T13:37:00Z
+maintenance window: active until 04:00 UTC, change CHG-4498 (major version upgrade of postgres-main)
+
+### a178
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=payments severity=warning team=payments
+summary: Pod payments-23e5 is crash looping
+description: 1 of 12 payments pods has restarted 22 times in the last hour (OOMKilled). The other 11 replicas are healthy and the service error ratio is 0.15%.
+startsAt: 2026-10-15T12:39:00Z
+maintenance window: none
+
+### a179
+status: firing
+labels: alertname=PostgresConnectionsNearLimit env=production service=postgres-orders severity=critical team=platform
+summary: postgres-orders at 465 of 500 connections
+description: postgres-orders is using 465 of max_connections=500. Connections have grown steadily for 2 hours; at the current rate the limit is reached in about 44 minutes.
+startsAt: 2026-10-07T22:31:00Z
+maintenance window: none
+
+### a180
+status: firing
+labels: alertname=HighLatencyP99 env=production service=payments severity=critical team=payments
+summary: payments p99 latency is 1.8s
+description: p99 request latency on payments has been above 1s for 16 minutes. Current p99 1.8s. Error ratio unchanged at 0.12%.
+startsAt: 2026-10-12T01:13:00Z
+maintenance window: none
+
+### a181
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for status.example.com expires in 6 days
+description: The public certificate served on status.example.com:443 expires in 6 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T05:08:00Z
+maintenance window: none
+
+### a182
+status: firing
+labels: alertname=HighLatencyP99 env=production service=payments severity=warning team=payments
+summary: payments p99 latency is 4.1s
+description: p99 request latency on payments has been above 2s for 23 minutes. Current p99 4.1s, p50 0.48s.
+startsAt: 2026-10-06T05:42:00Z
+maintenance window: none
+
+### a183
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for pay.example.com expires in 16 hours
+description: The public certificate served on pay.example.com:443 expires in 16 hours. Automatic renewal has failed 3 times (last error: ACME DNS-01 challenge timed out).
+startsAt: 2026-10-08T15:37:00Z
+maintenance window: none
+
+### a184
+status: firing
+labels: alertname=EndpointDown env=production service=search-v1-legacy severity=critical decommissioned=true
+summary: search-v1-legacy health check failing from all probe locations
+description: Blackbox probe to https://search-v1-legacy.internal/healthz has failed from 3 of 3 locations for 555 minutes. The target was decommissioned on 2026-09-25 and its probe was never removed.
+startsAt: 2026-10-23T19:11:00Z
+maintenance window: none
+
+### a185
+status: firing
+labels: alertname=HighErrorRate env=production service=payments severity=info team=payments
+summary: payments 5xx ratio is 6.3%
+description: 5xx responses on payments have been above 2% for 9 minutes. Current value 6.3% of 1,290 req/s.
+startsAt: 2026-10-05T04:02:00Z
+maintenance window: none
+
+### a186
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=warning target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T15:25:00Z
+maintenance window: none
+
+### a187
+status: firing
+labels: alertname=HighErrorRate env=staging service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 15.7% in staging
+description: 5xx responses on checkout in staging have been above 2% for 37 minutes. Current value 15.7%. No release is waiting on this environment.
+startsAt: 2026-10-26T03:27:00Z
+maintenance window: none
+
+### a188
+status: resolved
+labels: alertname=EndpointDown env=production service=storefront severity=warning team=web
+summary: storefront health check recovered
+description: The blackbox probe to https://storefront.internal/healthz failed from 1 of 3 locations and recovered after 2 minutes. The service error ratio stayed at 0.02% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T12:10:00Z
+endsAt: 2026-10-22T12:12:00Z
+maintenance window: none
+
+### a189
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=postgres-orders severity=info team=platform
+summary: postgres-orders data volume 87.6% full
+description: The data volume on postgres-orders (database) is filling. Linear prediction over the last 6 hours: full in 8 hours.
+startsAt: 2026-10-13T11:23:00Z
+maintenance window: none
+
+### a190
+status: firing
+labels: alertname=HighErrorRate env=production service=ci-runners severity=info team=platform
+summary: ci-runners 5xx ratio is 12.7%
+description: 5xx responses on ci-runners have been above 2% for 6 minutes. Current value 12.7% of 83 req/s.
+startsAt: 2026-10-10T22:35:00Z
+maintenance window: none
+
+### a191
+status: firing
+labels: alertname=PostgresConnectionsNearLimit env=production service=postgres-main severity=critical team=platform
+summary: postgres-main at 380 of 400 connections
+description: postgres-main is using 380 of max_connections=400. Connections have grown steadily for 2 hours; at the current rate the limit is reached in about 33 minutes.
+startsAt: 2026-10-08T09:20:00Z
+maintenance window: none
+
+### a192
+status: firing
+labels: alertname=HighErrorRate env=staging service=storefront severity=warning team=web
+summary: storefront 5xx ratio is 50.7% in staging
+description: 5xx responses on storefront in staging have been above 2% for 5 minutes. Current value 50.7%. No release is waiting on this environment.
+startsAt: 2026-10-20T18:47:00Z
+maintenance window: none
+
+### a193
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T05:19:00Z
+maintenance window: none
+
+### a194
+status: firing
+labels: alertname=EndpointDown env=production service=payments-sandbox-2024 severity=critical decommissioned=true
+summary: payments-sandbox-2024 health check failing from all probe locations
+description: Blackbox probe to https://payments-sandbox-2024.internal/healthz has failed from 3 of 3 locations for 412 minutes. The target was decommissioned on 2026-09-15 and its probe was never removed.
+startsAt: 2026-10-24T02:52:00Z
+maintenance window: none
+
+### a195
+status: firing
+labels: alertname=DeploymentRolledOut env=production service=admin-dashboard severity=info team=backoffice
+summary: admin-dashboard rolled out version 295
+description: Deployment admin-dashboard finished rolling out: 4 of 11 pods updated and ready.
+startsAt: 2026-10-19T14:39:00Z
+maintenance window: none
+
+### a196
+status: firing
+labels: alertname=HighErrorRate env=staging service=payments severity=critical team=payments
+summary: payments 5xx ratio is 34.8% in staging
+description: 5xx responses on payments in staging have been above 2% for 25 minutes. Current value 34.8%. No release is waiting on this environment.
+startsAt: 2026-10-25T22:29:00Z
+maintenance window: none
+
+### a197
+status: firing
+labels: alertname=HighErrorRate env=production service=feature-flags severity=warning team=platform
+summary: feature-flags 5xx ratio is 15.3%
+description: 5xx responses on feature-flags have been above 2% for 25 minutes. Current value 15.3% of 86 req/s.
+startsAt: 2026-10-11T05:33:00Z
+maintenance window: none
+
+### a198
+status: firing
+labels: alertname=EndpointDown env=production service=payments-sandbox-2024 severity=critical decommissioned=true
+summary: payments-sandbox-2024 health check failing from all probe locations
+description: Blackbox probe to https://payments-sandbox-2024.internal/healthz has failed from 3 of 3 locations for 555 minutes. The target was decommissioned on 2026-09-13 and its probe was never removed.
+startsAt: 2026-10-23T08:52:00Z
+maintenance window: none
+
+### a199
+status: firing
+labels: alertname=HighErrorRate env=production service=reporting severity=warning team=data
+summary: reporting 5xx ratio is 14.6%
+description: 5xx responses on reporting have been above 2% for 20 minutes. Current value 14.6% of 15 req/s.
+startsAt: 2026-10-10T14:57:00Z
+maintenance window: none
+
+### a200
+status: firing
+labels: alertname=HighErrorRate env=sandbox service=auth severity=warning team=identity
+summary: auth 5xx ratio is 12.4% in sandbox
+description: 5xx responses on auth in sandbox have been above 2% for 16 minutes. Current value 12.4%. No release is waiting on this environment.
+startsAt: 2026-10-20T12:27:00Z
+maintenance window: none
+
+exec
+/bin/bash -lc "sed -n '/"'^### a046$/,/''^### a080$/p'"' alerts.txt" in ./second-reader
+ succeeded in 206ms:
+### a046
+status: firing
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check failing from all probe locations
+description: Blackbox probe to https://checkout.internal/healthz has failed from 3 of 3 locations for 8 minutes. Last error: HTTP 503.
+startsAt: 2026-10-06T10:27:00Z
+maintenance window: none
+
+### a047
+status: firing
+labels: alertname=CronJobFailed env=production service=search severity=info team=discovery
+summary: CronJob monthly-invoice-export failed
+description: The Kubernetes CronJob monthly-invoice-export failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T08:28:00Z
+maintenance window: none
+
+### a048
+status: firing
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check failing from all probe locations
+description: Blackbox probe to https://checkout.internal/healthz has failed from 3 of 3 locations for 14 minutes. Last error: connection refused.
+startsAt: 2026-10-06T09:49:00Z
+maintenance window: none
+
+### a049
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 93.7% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 42 minutes.
+startsAt: 2026-10-10T01:14:00Z
+maintenance window: none
+
+### a050
+status: firing
+labels: alertname=EndpointDown env=production service=image-resizer severity=warning team=web
+summary: image-resizer health check failing from all probe locations
+description: Blackbox probe to https://image-resizer.internal/healthz has failed from 3 of 3 locations for 16 minutes. Last error: HTTP 502.
+startsAt: 2026-10-19T04:21:00Z
+maintenance window: none
+
+### a051
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for status.example.com expires in 7 days
+description: The public certificate served on status.example.com:443 expires in 7 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T16:56:00Z
+maintenance window: none
+
+### a052
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-42 NotReady
+description: 1 of 9 worker nodes has been NotReady for 37 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T02:04:00Z
+maintenance window: none
+
+### a053
+status: resolved
+labels: alertname=EndpointDown env=production service=payments severity=warning team=payments
+summary: payments health check recovered
+description: The blackbox probe to https://payments.internal/healthz failed from 1 of 3 locations and recovered after 1 minutes. The service error ratio stayed at 0.03% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T01:10:00Z
+endsAt: 2026-10-22T01:11:00Z
+maintenance window: none
+
+### a054
+status: firing
+labels: alertname=HighLatencyP99 env=production service=search severity=critical team=discovery
+summary: search p99 latency is 4.7s
+description: p99 request latency on search has been above 2s for 15 minutes. Current p99 4.7s, p50 0.83s.
+startsAt: 2026-10-05T16:02:00Z
+maintenance window: none
+
+### a055
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=critical team=payments
+summary: payments availability SLO burning at 25.4x
+description: The 99.9% availability SLO for payments is burning error budget at 25.4x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 28 hours.
+startsAt: 2026-10-07T06:38:00Z
+maintenance window: none
+
+### a056
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=critical team=platform
+summary: kafka-broker-2 data volume 96.9% full
+description: The data volume on kafka-broker-2 (queue) is 96.9% full and growing. Linear prediction over the last 30 minutes: full in 39 minutes.
+startsAt: 2026-10-07T15:50:00Z
+maintenance window: none
+
+### a057
+status: firing
+labels: alertname=EndpointDown env=production service=payments-sandbox-2024 severity=warning decommissioned=true
+summary: payments-sandbox-2024 health check failing from all probe locations
+description: Blackbox probe to https://payments-sandbox-2024.internal/healthz has failed from 3 of 3 locations for 105 minutes. The target was decommissioned on 2026-09-20 and its probe was never removed.
+startsAt: 2026-10-23T12:24:00Z
+maintenance window: none
+
+### a058
+status: resolved
+labels: alertname=EndpointDown env=production service=api-gateway severity=warning team=platform
+summary: api-gateway health check recovered
+description: The blackbox probe to https://api-gateway.internal/healthz failed from 1 of 3 locations and recovered after 3 minutes. The service error ratio stayed at 0.05% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T06:35:00Z
+endsAt: 2026-10-22T06:38:00Z
+maintenance window: none
+
+### a059
+status: firing
+labels: alertname=PostgresConnectionsNearLimit env=production service=postgres-main severity=critical team=platform
+summary: postgres-main at 465 of 500 connections
+description: postgres-main is using 465 of max_connections=500. Connections have grown steadily for 2 hours; at the current rate the limit is reached in about 33 minutes.
+startsAt: 2026-10-08T03:48:00Z
+maintenance window: none
+
+### a060
+status: firing
+labels: alertname=EndpointDown env=production service=search-v1-legacy severity=critical decommissioned=true
+summary: search-v1-legacy health check failing from all probe locations
+description: Blackbox probe to https://search-v1-legacy.internal/healthz has failed from 3 of 3 locations for 149 minutes. The target was decommissioned on 2026-09-30 and its probe was never removed.
+startsAt: 2026-10-24T00:10:00Z
+maintenance window: none
+
+### a061
+status: firing
+labels: alertname=HighLatencyP99 env=production service=storefront severity=warning team=web
+summary: storefront p99 latency is 1.3s
+description: p99 request latency on storefront has been above 1s for 33 minutes. Current p99 1.3s. Error ratio unchanged at 0.21%.
+startsAt: 2026-10-12T06:58:00Z
+maintenance window: none
+
+### a062
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-orders severity=warning team=platform
+summary: Nightly backup of postgres-orders failed
+description: The nightly pg_basebackup job for postgres-orders exited with code 1 (disk quota exceeded on the backup host). The last successful backup was 25 hours ago.
+startsAt: 2026-10-16T12:00:00Z
+maintenance window: none
+
+### a063
+status: firing
+labels: alertname=HighLatencyP99 env=production service=auth severity=warning team=identity
+summary: auth p99 latency is 1.5s
+description: p99 request latency on auth has been above 1s for 20 minutes. Current p99 1.5s. Error ratio unchanged at 0.06%.
+startsAt: 2026-10-12T09:36:00Z
+maintenance window: none
+
+### a064
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=info team=payments
+summary: payments availability SLO burning at 2.7x
+description: The 99.9% availability SLO for payments is burning error budget at 2.7x over the last 6h. At this rate the monthly budget is gone in 267 hours.
+startsAt: 2026-10-12T23:51:00Z
+maintenance window: none
+
+### a065
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for pay.example.com expires in 8 hours
+description: The public certificate served on pay.example.com:443 expires in 8 hours. Automatic renewal has failed 3 times (last error: ACME DNS-01 challenge timed out).
+startsAt: 2026-10-08T13:31:00Z
+maintenance window: none
+
+### a066
+status: firing
+labels: alertname=HighErrorRate env=production service=email-digest severity=warning team=growth
+summary: email-digest 5xx ratio is 15.3%
+description: 5xx responses on email-digest have been above 2% for 7 minutes. Current value 15.3% of 93 req/s.
+startsAt: 2026-10-11T03:02:00Z
+maintenance window: none
+
+### a067
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T11:47:00Z
+maintenance window: none
+
+### a068
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=redis-sessions severity=critical team=platform
+summary: redis-sessions data volume 96.8% full
+description: The data volume on redis-sessions (cache) is 96.8% full and growing. Linear prediction over the last 30 minutes: full in 48 minutes.
+startsAt: 2026-10-07T09:51:00Z
+maintenance window: none
+
+### a069
+status: firing
+labels: alertname=HighErrorRate env=preview service=search severity=warning team=discovery
+summary: search 5xx ratio is 21.8% in preview
+description: 5xx responses on search in preview have been above 2% for 37 minutes. Current value 21.8%. No release is waiting on this environment.
+startsAt: 2026-10-25T18:41:00Z
+maintenance window: none
+
+### a070
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=info team=platform
+summary: kafka-broker-2 data volume 85.1% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 12 hours.
+startsAt: 2026-10-13T14:47:00Z
+maintenance window: none
+
+### a071
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-36 NotReady
+description: 1 of 8 worker nodes has been NotReady for 28 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-15T21:24:00Z
+maintenance window: none
+
+### a072
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=search severity=critical team=discovery
+summary: search availability SLO burning at 25.6x
+description: The 99.9% availability SLO for search is burning error budget at 25.6x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 28 hours.
+startsAt: 2026-10-06T21:51:00Z
+maintenance window: none
+
+### a073
+status: firing
+labels: alertname=EndpointDown env=production service=payments-sandbox-2024 severity=critical decommissioned=true
+summary: payments-sandbox-2024 health check failing from all probe locations
+description: Blackbox probe to https://payments-sandbox-2024.internal/healthz has failed from 3 of 3 locations for 409 minutes. The target was decommissioned on 2026-09-30 and its probe was never removed.
+startsAt: 2026-10-23T23:45:00Z
+maintenance window: none
+
+### a074
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=critical team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: root account API call from an IP address never seen before (AS-unknown), confirmed by the detector with high confidence.
+startsAt: 2026-10-09T20:51:00Z
+maintenance window: none
+
+### a075
+status: resolved
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check recovered
+description: The blackbox probe to https://checkout.internal/healthz failed from 1 of 3 locations and recovered after 1 minutes. The service error ratio stayed at 0.08% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-21T16:36:00Z
+endsAt: 2026-10-21T16:37:00Z
+maintenance window: none
+
+### a076
+status: firing
+labels: alertname=HighLatencyP99 env=production service=search severity=warning team=discovery
+summary: search p99 latency is 1.7s
+description: p99 request latency on search has been above 1s for 40 minutes. Current p99 1.7s. Error ratio unchanged at 0.29%.
+startsAt: 2026-10-12T01:43:00Z
+maintenance window: none
+
+### a077
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=warning team=payments
+summary: payments availability SLO burning at 2.7x
+description: The 99.9% availability SLO for payments is burning error budget at 2.7x over the last 6h. At this rate the monthly budget is gone in 267 hours.
+startsAt: 2026-10-12T23:31:00Z
+maintenance window: none
+
+### a078
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=critical team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 7 minutes.
+startsAt: 2026-10-23T05:35:00Z
+maintenance window: active until 05:00 UTC, change CHG-4200 (major version upgrade of postgres-orders)
+
+### a079
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=auth severity=info team=identity
+summary: auth availability SLO burning at 2.9x
+description: The 99.9% availability SLO for auth is burning error budget at 2.9x over the last 6h. At this rate the monthly budget is gone in 248 hours.
+startsAt: 2026-10-13T06:17:00Z
+maintenance window: none
+
+### a080
+
+exec
+/bin/bash -lc "sed -n '/"'^### a080$/,/''^### a115$/p'"' alerts.txt" in ./second-reader
+ succeeded in 0ms:
+### a080
+status: firing
+labels: alertname=EndpointDown env=staging service=storefront severity=info team=web
+summary: storefront health check failing in staging
+description: Blackbox probe to https://storefront.staging.internal/healthz has failed for 24 minutes. This blocks release 2026.10.6, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T10:46:00Z
+maintenance window: none
+
+### a081
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=payments severity=warning team=payments
+summary: Pod payments-4a6 is crash looping
+description: 1 of 8 payments pods has restarted 22 times in the last hour (OOMKilled). The other 7 replicas are healthy and the service error ratio is 0.02%.
+startsAt: 2026-10-15T08:05:00Z
+maintenance window: none
+
+### a082
+status: firing
+labels: alertname=HighErrorRate env=production service=ci-runners severity=warning team=platform
+summary: ci-runners 5xx ratio is 6.9%
+description: 5xx responses on ci-runners have been above 2% for 32 minutes. Current value 6.9% of 95 req/s.
+startsAt: 2026-10-11T06:22:00Z
+maintenance window: none
+
+### a083
+status: firing
+labels: alertname=EndpointDown env=production service=reporting severity=warning team=data
+summary: reporting health check failing from all probe locations
+description: Blackbox probe to https://reporting.internal/healthz has failed from 3 of 3 locations for 11 minutes. Last error: timeout after 10s.
+startsAt: 2026-10-19T01:30:00Z
+maintenance window: none
+
+### a084
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=checkout severity=info team=payments
+summary: checkout 5xx ratio is 1.7%
+description: 5xx responses on checkout have been above the team alert threshold of 1% for 24 minutes. Current value 1.7%.
+startsAt: 2026-10-12T00:05:00Z
+maintenance window: none
+
+### a085
+status: resolved
+labels: alertname=EndpointDown env=production service=checkout severity=critical team=payments
+summary: checkout health check recovered
+description: The blackbox probe to https://checkout.internal/healthz failed from 1 of 3 locations and recovered after 4 minutes. The service error ratio stayed at 0.04% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-21T17:17:00Z
+endsAt: 2026-10-21T17:21:00Z
+maintenance window: none
+
+### a086
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T09:30:00Z
+maintenance window: none
+
+### a087
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=payments severity=warning team=payments
+summary: Pod payments-1840 is crash looping
+description: 1 of 5 payments pods has restarted 16 times in the last hour (OOMKilled). The other 4 replicas are healthy and the service error ratio is 0.03%.
+startsAt: 2026-10-15T11:42:00Z
+maintenance window: none
+
+### a088
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for docs.example.com expires in 10 days
+description: The public certificate served on docs.example.com:443 expires in 10 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T02:41:00Z
+maintenance window: none
+
+### a089
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=warning team=platform
+summary: Certificate for sandbox.example.dev expires in 15 hours
+description: The certificate served on sandbox.example.dev:443 expires in 15 hours. Only internal testers use this host.
+startsAt: 2026-10-24T22:00:00Z
+maintenance window: none
+
+### a090
+status: firing
+labels: alertname=BackupJobFailed env=production service=postgres-main severity=info team=platform
+summary: Nightly backup of postgres-main failed
+description: The nightly pg_basebackup job for postgres-main exited with code 1 (authentication failed for the backup role). The last successful backup was 30 hours ago.
+startsAt: 2026-10-16T16:46:00Z
+maintenance window: none
+
+### a091
+status: resolved
+labels: alertname=EndpointDown env=production service=auth severity=warning team=identity
+summary: auth health check recovered
+description: The blackbox probe to https://auth.internal/healthz failed from 1 of 3 locations and recovered after 2 minutes. The service error ratio stayed at 0.06% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T02:05:00Z
+endsAt: 2026-10-22T02:07:00Z
+maintenance window: none
+
+### a092
+status: firing
+labels: alertname=HighErrorRate env=production service=email-digest severity=critical team=growth
+summary: email-digest 5xx ratio is 13.6%
+description: 5xx responses on email-digest have been above 2% for 22 minutes. Current value 13.6% of 63 req/s.
+startsAt: 2026-10-10T18:03:00Z
+maintenance window: none
+
+### a093
+status: resolved
+labels: alertname=EndpointDown env=production service=search severity=warning team=discovery
+summary: search health check recovered
+description: The blackbox probe to https://search.internal/healthz failed from 1 of 3 locations and recovered after 4 minutes. The service error ratio stayed at 0.04% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-21T22:07:00Z
+endsAt: 2026-10-21T22:11:00Z
+maintenance window: none
+
+### a094
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=search severity=warning team=discovery
+summary: Pod search-1478 is crash looping
+description: 1 of 4 search pods has restarted 24 times in the last hour (OOMKilled). The other 3 replicas are healthy and the service error ratio is 0.09%.
+startsAt: 2026-10-15T00:36:00Z
+maintenance window: none
+
+### a095
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 91.6% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 25 minutes.
+startsAt: 2026-10-10T01:55:00Z
+maintenance window: none
+
+### a096
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=critical team=platform
+summary: Certificate for sandbox.example.dev expires in 15 hours
+description: The certificate served on sandbox.example.dev:443 expires in 15 hours. Only internal testers use this host.
+startsAt: 2026-10-24T04:38:00Z
+maintenance window: none
+
+### a097
+status: firing
+labels: alertname=HPAScaledUp env=production service=auth severity=info team=identity
+summary: auth scaled from 6 to 10 replicas
+description: The HorizontalPodAutoscaler for auth added replicas because CPU utilization reached 82% (target 70%). Latency and errors are normal.
+startsAt: 2026-10-20T03:58:00Z
+maintenance window: none
+
+### a098
+status: firing
+labels: alertname=EndpointDown env=production service=feature-flags severity=warning team=platform
+summary: feature-flags health check failing from all probe locations
+description: Blackbox probe to https://feature-flags.internal/healthz has failed from 3 of 3 locations for 4 minutes. Last error: HTTP 502.
+startsAt: 2026-10-18T13:39:00Z
+maintenance window: none
+
+### a099
+status: firing
+labels: alertname=HighErrorRate env=production service=search severity=critical team=discovery
+summary: search 5xx ratio is 7.1%
+description: 5xx responses on search have been above 2% for 7 minutes. Current value 7.1% of 1,916 req/s.
+startsAt: 2026-10-05T10:27:00Z
+maintenance window: none
+
+### a100
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=api-gateway severity=critical team=platform
+summary: api-gateway 5xx ratio is 1.9%
+description: 5xx responses on api-gateway have been above the team alert threshold of 1% for 11 minutes. Current value 1.9%.
+startsAt: 2026-10-11T08:06:00Z
+maintenance window: none
+
+### a101
+status: firing
+labels: alertname=EndpointDown env=staging service=checkout severity=warning team=payments
+summary: checkout health check failing in staging
+description: Blackbox probe to https://checkout.staging.internal/healthz has failed for 39 minutes. This blocks release 2026.10.8, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T11:30:00Z
+maintenance window: none
+
+### a102
+status: firing
+labels: alertname=HighErrorRate env=dev service=storefront severity=warning team=web
+summary: storefront 5xx ratio is 37.5% in dev
+description: 5xx responses on storefront in dev have been above 2% for 23 minutes. Current value 37.5%. No release is waiting on this environment.
+startsAt: 2026-10-20T19:34:00Z
+maintenance window: none
+
+### a103
+status: firing
+labels: alertname=CronJobFailed env=production service=search severity=warning team=discovery
+summary: CronJob search-reindex-nightly failed
+description: The Kubernetes CronJob search-reindex-nightly failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T14:57:00Z
+maintenance window: none
+
+### a104
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=warning team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: an interactive shell was opened inside a payments pod by an unknown process; runtime detector verdict: confirmed intrusion.
+startsAt: 2026-10-09T12:26:00Z
+maintenance window: none
+
+### a105
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 7 minutes.
+startsAt: 2026-10-22T18:37:00Z
+maintenance window: active until 05:00 UTC, change CHG-4715 (major version upgrade of postgres-main)
+
+### a106
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T17:40:00Z
+maintenance window: none
+
+### a107
+status: firing
+labels: alertname=ElevatedErrorRate env=production service=search severity=warning team=discovery
+summary: search 5xx ratio is 1.5%
+description: 5xx responses on search have been above the team alert threshold of 1% for 18 minutes. Current value 1.5%.
+startsAt: 2026-10-11T21:43:00Z
+maintenance window: none
+
+### a108
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=warning team=platform
+summary: Certificate for sandbox.example.dev expires in 13 hours
+description: The certificate served on sandbox.example.dev:443 expires in 13 hours. Only internal testers use this host.
+startsAt: 2026-10-24T03:17:00Z
+maintenance window: none
+
+### a109
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=warning team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 8 minutes. Replicas report replication lag growing. No failover has happened.
+startsAt: 2026-10-08T23:41:00Z
+maintenance window: none
+
+### a110
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T07:22:00Z
+maintenance window: none
+
+### a111
+status: firing
+labels: alertname=HighErrorRate env=preview service=search severity=critical team=discovery
+summary: search 5xx ratio is 47.3% in preview
+description: 5xx responses on search in preview have been above 2% for 25 minutes. Current value 47.3%. No release is waiting on this environment.
+startsAt: 2026-10-26T01:29:00Z
+maintenance window: none
+
+### a112
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=checkout severity=warning team=payments
+summary: Pod checkout-15f8 is crash looping
+description: 1 of 6 checkout pods has restarted 25 times in the last hour (OOMKilled). The other 5 replicas are healthy and the service error ratio is 0.2%.
+startsAt: 2026-10-14T22:43:00Z
+maintenance window: none
+
+### a113
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-23 NotReady
+description: 1 of 19 worker nodes has been NotReady for 25 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T08:18:00Z
+maintenance window: none
+
+### a114
+status: firing
+labels: alertname=CronJobFailed env=production service=reporting severity=info team=data
+summary: CronJob monthly-invoice-export failed
+description: The Kubernetes CronJob monthly-invoice-export failed its last run (BackoffLimitExceeded). The previous run succeeded. The job is retried on its next schedule.
+startsAt: 2026-10-17T06:18:00Z
+maintenance window: none
+
+### a115
+
+exec
+/bin/bash -lc "sed -n '/"'^### a115$/,/''^### a150$/p'"' alerts.txt" in ./second-reader
+ succeeded in 200ms:
+### a115
+status: resolved
+labels: alertname=EndpointDown env=production service=auth severity=warning team=identity
+summary: auth health check recovered
+description: The blackbox probe to https://auth.internal/healthz failed from 1 of 3 locations and recovered after 4 minutes. The service error ratio stayed at 0.09% the whole time; no customer-facing errors were recorded.
+startsAt: 2026-10-22T10:30:00Z
+endsAt: 2026-10-22T10:34:00Z
+maintenance window: none
+
+### a116
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T09:34:00Z
+maintenance window: none
+
+### a117
+status: firing
+labels: alertname=EndpointDown env=production service=admin-dashboard severity=info team=backoffice
+summary: admin-dashboard health check failing from all probe locations
+description: Blackbox probe to https://admin-dashboard.internal/healthz has failed from 3 of 3 locations for 23 minutes. Last error: connection refused.
+startsAt: 2026-10-18T17:48:00Z
+maintenance window: none
+
+### a118
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-main severity=critical team=platform
+summary: postgres-main primary not responding
+description: The primary of postgres-main has not answered health checks for 8 minutes.
+startsAt: 2026-10-23T00:09:00Z
+maintenance window: active until 05:00 UTC, change CHG-4728 (major version upgrade of postgres-main)
+
+### a119
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=warning team=platform
+summary: Certificate for status.example.com expires in 9 days
+description: The public certificate served on status.example.com:443 expires in 9 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T12:11:00Z
+maintenance window: none
+
+### a120
+status: firing
+labels: alertname=HighErrorRate env=production service=storefront severity=critical team=web
+summary: storefront 5xx ratio is 4.4%
+description: 5xx responses on storefront have been above 2% for 6 minutes. Current value 4.4% of 2,571 req/s.
+startsAt: 2026-10-05T08:30:00Z
+maintenance window: none
+
+### a121
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=dev service=edge severity=critical team=platform
+summary: Certificate for dev.example.dev expires in 2 hours
+description: The certificate served on dev.example.dev:443 expires in 2 hours. Only internal testers use this host.
+startsAt: 2026-10-24T18:47:00Z
+maintenance window: none
+
+### a122
+status: firing
+labels: alertname=EndpointDown env=production service=payments severity=critical team=payments
+summary: payments health check failing from all probe locations
+description: Blackbox probe to https://payments.internal/healthz has failed from 3 of 3 locations for 13 minutes. Last error: timeout after 10s.
+startsAt: 2026-10-06T08:48:00Z
+maintenance window: none
+
+### a123
+status: firing
+labels: alertname=SyntheticCheckFailing env=production service=synthetic-canary severity=critical target=canary-test-target test=true
+summary: Synthetic check against canary-test-target failing
+description: The synthetic check against canary-test-target, a known test target that the monitoring team breaks on purpose to test alert routing, has failed for 12 minutes.
+startsAt: 2026-10-25T06:07:00Z
+maintenance window: none
+
+### a124
+status: firing
+labels: alertname=EndpointDown env=staging service=storefront severity=warning team=web
+summary: storefront health check failing in staging
+description: Blackbox probe to https://storefront.staging.internal/healthz has failed for 46 minutes. This blocks release 2026.10.3, which is waiting on the staging smoke tests.
+startsAt: 2026-10-18T08:55:00Z
+maintenance window: none
+
+### a125
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=payments severity=warning team=payments
+summary: payments availability SLO burning at 2.3x
+description: The 99.9% availability SLO for payments is burning error budget at 2.3x over the last 6h. At this rate the monthly budget is gone in 313 hours.
+startsAt: 2026-10-12T15:09:00Z
+maintenance window: none
+
+### a126
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=production service=edge severity=critical team=platform
+summary: Certificate for shop.example.com expires in 6 days
+description: The public certificate served on shop.example.com:443 expires in 6 days. The last renewal attempt failed: rate limited by the ACME server.
+startsAt: 2026-10-14T14:14:00Z
+maintenance window: none
+
+### a127
+status: firing
+labels: alertname=EndpointDown env=production service=storefront-old severity=warning decommissioned=true
+summary: storefront-old health check failing from all probe locations
+description: Blackbox probe to https://storefront-old.internal/healthz has failed from 3 of 3 locations for 102 minutes. The target was decommissioned on 2026-09-28 and its probe was never removed.
+startsAt: 2026-10-23T18:50:00Z
+maintenance window: none
+
+### a128
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=checkout severity=critical team=payments
+summary: checkout availability SLO burning at 17.8x
+description: The 99.9% availability SLO for checkout is burning error budget at 17.8x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 40 hours.
+startsAt: 2026-10-07T00:38:00Z
+maintenance window: none
+
+### a129
+status: firing
+labels: alertname=HighErrorRate env=production service=search severity=critical team=discovery
+summary: search 5xx ratio is 4.4%
+description: 5xx responses on search have been above 2% for 11 minutes. Current value 4.4% of 1,611 req/s.
+startsAt: 2026-10-05T05:45:00Z
+maintenance window: none
+
+### a130
+status: firing
+labels: alertname=UnauthorizedAccessDetected env=production service=cloud-account severity=warning team=security
+summary: Security detector: confirmed unauthorized access
+description: Detector finding: an interactive shell was opened inside a payments pod by an unknown process; runtime detector verdict: confirmed intrusion.
+startsAt: 2026-10-09T15:54:00Z
+maintenance window: none
+
+### a131
+status: firing
+labels: alertname=RedisMemoryNearLimit env=production service=redis-sessions severity=critical team=identity
+summary: redis-sessions memory at 93.7% of maxmemory
+description: redis-sessions stores login sessions for auth and has maxmemory-policy noeviction. Memory has grown 2% every 10 minutes; at this rate writes start failing in about 26 minutes.
+startsAt: 2026-10-10T05:07:00Z
+maintenance window: none
+
+### a132
+status: firing
+labels: alertname=PostgresPrimaryUnreachable env=production service=postgres-orders severity=warning team=platform
+summary: postgres-orders primary not responding
+description: The primary of postgres-orders has not answered health checks for 7 minutes.
+startsAt: 2026-10-22T17:03:00Z
+maintenance window: active until 05:00 UTC, change CHG-4281 (major version upgrade of postgres-orders)
+
+### a133
+status: firing
+labels: alertname=KubePodCrashLooping env=production service=search severity=warning team=discovery
+summary: Pod search-ad1 is crash looping
+description: 1 of 8 search pods has restarted 21 times in the last hour (OOMKilled). The other 7 replicas are healthy and the service error ratio is 0.16%.
+startsAt: 2026-10-15T03:41:00Z
+maintenance window: none
+
+### a134
+status: firing
+labels: alertname=EndpointDown env=production service=feature-flags severity=warning team=platform
+summary: feature-flags health check failing from all probe locations
+description: Blackbox probe to https://feature-flags.internal/healthz has failed from 3 of 3 locations for 26 minutes. Last error: connection refused.
+startsAt: 2026-10-18T21:14:00Z
+maintenance window: none
+
+### a135
+status: firing
+labels: alertname=HighLatencyP99 env=production service=payments severity=warning team=payments
+summary: payments p99 latency is 1.3s
+description: p99 request latency on payments has been above 1s for 29 minutes. Current p99 1.3s. Error ratio unchanged at 0.14%.
+startsAt: 2026-10-12T13:27:00Z
+maintenance window: none
+
+### a136
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=warning team=platform
+summary: kafka-broker-2 data volume 89.2% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 11 hours.
+startsAt: 2026-10-13T22:19:00Z
+maintenance window: none
+
+### a137
+status: firing
+labels: alertname=HighErrorRate env=preview service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 46.2% in preview
+description: 5xx responses on checkout in preview have been above 2% for 17 minutes. Current value 46.2%. No release is waiting on this environment.
+startsAt: 2026-10-21T07:28:00Z
+maintenance window: none
+
+### a138
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=warning team=platform
+summary: Node worker-12 NotReady
+description: 1 of 14 worker nodes has been NotReady for 36 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-15T18:58:00Z
+maintenance window: none
+
+### a139
+status: firing
+labels: alertname=Watchdog env=production service=alertmanager severity=none team=platform
+summary: Alerting pipeline heartbeat
+description: This alert is always firing. It proves the whole alerting pipeline works. It is meant for a dead man's switch, not for people.
+startsAt: 2026-10-19T11:57:00Z
+maintenance window: none
+
+### a140
+status: firing
+labels: alertname=KubeNodeNotReady env=production service=kubernetes severity=critical team=platform
+summary: Node worker-46 NotReady
+description: 1 of 22 worker nodes has been NotReady for 40 minutes (kubelet stopped posting status). Its pods were rescheduled on other nodes; no service reports errors.
+startsAt: 2026-10-16T06:02:00Z
+maintenance window: none
+
+### a141
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=checkout severity=critical team=payments
+summary: checkout availability SLO burning at 4.6x
+description: The 99.9% availability SLO for checkout is burning error budget at 4.6x over the last 6h. At this rate the monthly budget is gone in 157 hours.
+startsAt: 2026-10-12T16:21:00Z
+maintenance window: none
+
+### a142
+status: firing
+labels: alertname=EndpointDown env=production service=admin-dashboard severity=critical team=backoffice
+summary: admin-dashboard health check failing from all probe locations
+description: Blackbox probe to https://admin-dashboard.internal/healthz has failed from 3 of 3 locations for 27 minutes. Last error: HTTP 502.
+startsAt: 2026-10-18T18:30:00Z
+maintenance window: none
+
+### a143
+status: firing
+labels: alertname=HighLatencyP99 env=production service=checkout severity=warning team=payments
+summary: checkout p99 latency is 1.2s
+description: p99 request latency on checkout has been above 1s for 26 minutes. Current p99 1.2s. Error ratio unchanged at 0.15%.
+startsAt: 2026-10-12T04:41:00Z
+maintenance window: none
+
+### a144
+status: firing
+labels: alertname=SLOErrorBudgetBurn env=production service=api-gateway severity=critical team=platform
+summary: api-gateway availability SLO burning at 36.1x
+description: The 99.9% availability SLO for api-gateway is burning error budget at 36.1x over the last 1h (5m window also above threshold). At this rate the monthly budget is gone in 20 hours.
+startsAt: 2026-10-07T01:36:00Z
+maintenance window: none
+
+### a145
+status: firing
+labels: alertname=DeploymentRolledOut env=production service=search severity=info team=discovery
+summary: search rolled out version 170
+description: Deployment search finished rolling out: 7 of 3 pods updated and ready.
+startsAt: 2026-10-20T01:32:00Z
+maintenance window: none
+
+### a146
+status: firing
+labels: alertname=TLSCertificateExpiringSoon env=sandbox service=edge severity=warning team=platform
+summary: Certificate for sandbox.example.dev expires in 13 hours
+description: The certificate served on sandbox.example.dev:443 expires in 13 hours. Only internal testers use this host.
+startsAt: 2026-10-24T14:01:00Z
+maintenance window: none
+
+### a147
+status: firing
+labels: alertname=HighErrorRate env=production service=checkout severity=warning team=payments
+summary: checkout 5xx ratio is 6.4%
+description: 5xx responses on checkout have been above 2% for 7 minutes.
+startsAt: 2026-10-22T17:33:00Z
+maintenance window: active until 05:00 UTC, change CHG-4932 (checkout database migration)
+
+### a148
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=postgres-main severity=warning team=platform
+summary: postgres-main data volume 84.3% full
+description: The data volume on postgres-main (database) is filling. Linear prediction over the last 6 hours: full in 2.3 days.
+startsAt: 2026-10-13T17:28:00Z
+maintenance window: none
+
+### a149
+status: firing
+labels: alertname=DiskWillFillSoon env=production service=kafka-broker-2 severity=warning team=platform
+summary: kafka-broker-2 data volume 86.9% full
+description: The data volume on kafka-broker-2 (queue) is filling. Linear prediction over the last 6 hours: full in 2.5 days.
+startsAt: 2026-10-13T11:51:00Z
+maintenance window: none
+
+### a150
+
+codex
+BEGIN LABELS
+a001 page
+a002 ticket
+a003 page
+a004 ignore
+a005 page
+a006 ticket
+a007 page
+a008 ticket
+a009 ignore
+a010 ticket
+a011 page
+a012 ticket
+a013 page
+a014 ticket
+a015 ticket
+a016 page
+a017 ignore
+a018 page
+a019 ignore
+a020 ignore
+a021 ignore
+a022 ticket
+a023 page
+a024 ticket
+a025 ticket
+a026 ignore
+a027 ignore
+a028 ticket
+a029 ticket
+a030 ticket
+a031 ticket
+a032 ticket
+a033 page
+a034 ticket
+a035 ticket
+a036 ticket
+a037 ticket
+a038 page
+a039 ignore
+a040 page
+a041 ignore
+a042 page
+a043 ignore
+a044 ticket
+a045 ticket
+a046 page
+a047 ticket
+a048 page
+a049 page
+a050 ticket
+a051 ticket
+a052 ticket
+a053 ignore
+a054 page
+a055 page
+a056 page
+a057 ignore
+a058 ignore
+a059 page
+a060 ignore
+a061 ticket
+a062 ticket
+a063 ticket
+a064 ticket
+a065 page
+a066 ticket
+a067 ignore
+a068 page
+a069 ignore
+a070 ticket
+a071 ticket
+a072 page
+a073 ignore
+a074 page
+a075 ignore
+a076 ticket
+a077 ticket
+a078 ignore
+a079 ticket
+a080 ticket
+a081 ticket
+a082 ticket
+a083 ticket
+a084 ticket
+a085 ignore
+a086 ignore
+a087 ticket
+a088 ticket
+a089 ignore
+a090 ticket
+a091 ignore
+a092 ticket
+a093 ignore
+a094 ticket
+a095 page
+a096 ignore
+a097 ignore
+a098 ticket
+a099 page
+a100 ticket
+a101 ticket
+a102 ignore
+a103 ticket
+a104 page
+a105 ignore
+a106 ignore
+a107 ticket
+a108 ignore
+a109 page
+a110 ignore
+a111 ignore
+a112 ticket
+a113 ticket
+a114 ticket
+a115 ignore
+a116 ignore
+a117 ticket
+a118 ignore
+a119 ticket
+a120 page
+a121 ignore
+a122 page
+a123 ignore
+a124 ticket
+a125 ticket
+a126 ticket
+a127 ignore
+a128 page
+a129 page
+a130 page
+a131 page
+a132 ignore
+a133 ticket
+a134 ticket
+a135 ticket
+a136 ticket
+a137 ignore
+a138 ticket
+a139 ignore
+a140 ticket
+a141 ticket
+a142 ticket
+a143 ticket
+a144 page
+a145 ignore
+a146 ignore
+a147 ignore
+a148 ticket
+a149 ticket
+a150 page
+a151 ticket
+a152 ignore
+a153 ignore
+a154 ticket
+a155 page
+a156 page
+a157 ticket
+a158 ticket
+a159 page
+a160 ignore
+a161 page
+a162 ticket
+a163 ticket
+a164 page
+a165 page
+a166 ticket
+a167 page
+a168 ignore
+a169 page
+a170 ignore
+a171 ticket
+a172 ignore
+a173 ignore
+a174 ignore
+a175 ignore
+a176 page
+a177 ignore
+a178 ticket
+a179 page
+a180 ticket
+a181 ticket
+a182 page
+a183 page
+a184 ignore
+a185 page
+a186 ignore
+a187 ignore
+a188 ignore
+a189 ticket
+a190 ticket
+a191 page
+a192 ignore
+a193 ignore
+a194 ignore
+a195 ignore
+a196 ignore
+a197 ticket
+a198 ignore
+a199 ticket
+a200 ignore
+END LABELS
+tokens used
+24,946
+BEGIN LABELS
+a001 page
+a002 ticket
+a003 page
+a004 ignore
+a005 page
+a006 ticket
+a007 page
+a008 ticket
+a009 ignore
+a010 ticket
+a011 page
+a012 ticket
+a013 page
+a014 ticket
+a015 ticket
+a016 page
+a017 ignore
+a018 page
+a019 ignore
+a020 ignore
+a021 ignore
+a022 ticket
+a023 page
+a024 ticket
+a025 ticket
+a026 ignore
+a027 ignore
+a028 ticket
+a029 ticket
+a030 ticket
+a031 ticket
+a032 ticket
+a033 page
+a034 ticket
+a035 ticket
+a036 ticket
+a037 ticket
+a038 page
+a039 ignore
+a040 page
+a041 ignore
+a042 page
+a043 ignore
+a044 ticket
+a045 ticket
+a046 page
+a047 ticket
+a048 page
+a049 page
+a050 ticket
+a051 ticket
+a052 ticket
+a053 ignore
+a054 page
+a055 page
+a056 page
+a057 ignore
+a058 ignore
+a059 page
+a060 ignore
+a061 ticket
+a062 ticket
+a063 ticket
+a064 ticket
+a065 page
+a066 ticket
+a067 ignore
+a068 page
+a069 ignore
+a070 ticket
+a071 ticket
+a072 page
+a073 ignore
+a074 page
+a075 ignore
+a076 ticket
+a077 ticket
+a078 ignore
+a079 ticket
+a080 ticket
+a081 ticket
+a082 ticket
+a083 ticket
+a084 ticket
+a085 ignore
+a086 ignore
+a087 ticket
+a088 ticket
+a089 ignore
+a090 ticket
+a091 ignore
+a092 ticket
+a093 ignore
+a094 ticket
+a095 page
+a096 ignore
+a097 ignore
+a098 ticket
+a099 page
+a100 ticket
+a101 ticket
+a102 ignore
+a103 ticket
+a104 page
+a105 ignore
+a106 ignore
+a107 ticket
+a108 ignore
+a109 page
+a110 ignore
+a111 ignore
+a112 ticket
+a113 ticket
+a114 ticket
+a115 ignore
+a116 ignore
+a117 ticket
+a118 ignore
+a119 ticket
+a120 page
+a121 ignore
+a122 page
+a123 ignore
+a124 ticket
+a125 ticket
+a126 ticket
+a127 ignore
+a128 page
+a129 page
+a130 page
+a131 page
+a132 ignore
+a133 ticket
+a134 ticket
+a135 ticket
+a136 ticket
+a137 ignore
+a138 ticket
+a139 ignore
+a140 ticket
+a141 ticket
+a142 ticket
+a143 ticket
+a144 page
+a145 ignore
+a146 ignore
+a147 ignore
+a148 ticket
+a149 ticket
+a150 page
+a151 ticket
+a152 ignore
+a153 ignore
+a154 ticket
+a155 page
+a156 page
+a157 ticket
+a158 ticket
+a159 page
+a160 ignore
+a161 page
+a162 ticket
+a163 ticket
+a164 page
+a165 page
+a166 ticket
+a167 page
+a168 ignore
+a169 page
+a170 ignore
+a171 ticket
+a172 ignore
+a173 ignore
+a174 ignore
+a175 ignore
+a176 page
+a177 ignore
+a178 ticket
+a179 page
+a180 ticket
+a181 ticket
+a182 page
+a183 page
+a184 ignore
+a185 page
+a186 ignore
+a187 ignore
+a188 ignore
+a189 ticket
+a190 ticket
+a191 page
+a192 ignore
+a193 ignore
+a194 ignore
+a195 ignore
+a196 ignore
+a197 ticket
+a198 ignore
+a199 ticket
+a200 ignore
+END LABELS
