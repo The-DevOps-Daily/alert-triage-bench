@@ -82,6 +82,7 @@ function loadDone() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function call(model, alert) {
+  const started = performance.now();
   let attempt = 0;
   for (;;) {
     attempt++;
@@ -104,7 +105,7 @@ async function call(model, alert) {
     }
     const ms = Math.round(performance.now() - t0);
     const retryable = !res || res.status === 429 || res.status >= 500;
-    if (res?.ok || !retryable || attempt >= 5) return { res, body, ms, attempt };
+    if (res?.ok || !retryable || attempt >= 5) return { res, body, ms, totalMs: Math.round(performance.now() - started), attempt };
     await sleep(Math.min(30_000, 1000 * 2 ** attempt + Math.random() * 500));
   }
 }
@@ -116,13 +117,13 @@ const jobs = [];
 for (let run = 1; run <= RUNS; run++)
   for (const model of MODELS)
     for (const a of alerts) if (!done.has(`${model}|${a.id}|${run}`)) jobs.push({ model, a, run });
-console.log(`to do: ${jobs.length} calls, budget $${BUDGET}`);
+console.log(`to do: ${jobs.length} calls, budget $${BUDGET} (checked after each call, so calls in flight can go past it), concurrency ${CONCURRENCY}, runs ${RUNS}`);
 
 let next = 0, stopped = false, finished = 0;
 async function worker() {
   while (!stopped && next < jobs.length) {
     const { model, a, run } = jobs[next++];
-    const { res, body, ms, attempt } = await call(model, a);
+    const { res, body, ms, totalMs, attempt } = await call(model, a);
     const text = body?.choices?.[0]?.message?.content ?? '';
     const served = body?.model ?? model;
     const c = res?.ok ? cost(served, body.usage) : 0;
@@ -130,11 +131,11 @@ async function worker() {
     const row = {
       model, run, id: a.id, label: a.label,
       decision: res?.ok ? parseDecision(text) : null,
-      served, status: res?.status ?? 0, attempts: attempt, ms,
+      served, status: res?.status ?? 0, attempts: attempt, ms, totalMs,
       usage: body?.usage ? { in: body.usage.prompt_tokens, out: body.usage.completion_tokens, reasoning: body.usage.completion_tokens_details?.reasoning_tokens ?? 0 } : null,
       cost: c, priced: Boolean(prices[served]),
       finish: body?.choices?.[0]?.finish_reason ?? null,
-      raw: text.slice(0, 400), error: res?.ok ? undefined : JSON.stringify(body?.error ?? body).slice(0, 300),
+      raw: text, error: res?.ok ? undefined : JSON.stringify(body?.error ?? body).slice(0, 300),
     };
     appendFileSync(fileFor(model), JSON.stringify(row) + '\n');
     finished++;

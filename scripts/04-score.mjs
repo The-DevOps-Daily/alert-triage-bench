@@ -22,6 +22,18 @@ const rawDir = new URL('results/raw/', root);
 const rows = readdirSync(rawDir).filter((f) => f.endsWith('.jsonl'))
   .flatMap((f) => readFileSync(new URL(f, rawDir), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)));
 
+// Price every call from its recorded token usage and the current prices.json,
+// not from the cost the runner stored: early calls to a model missing from
+// prices.json were stored at the runner's deliberately high fallback rate.
+const prices = JSON.parse(readFileSync(new URL('prices.json', root))).models;
+for (const r of rows) {
+  const p = prices[r.served];
+  if (p && r.usage) {
+    r.cost = (r.usage.in * p.in + r.usage.out * p.out) / 1e6;
+    r.priced = true;
+  }
+}
+
 const models = [...new Set(rows.map((r) => r.model))];
 const quantile = (xs, q) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -116,6 +128,12 @@ const summary = models.map((model) => {
     costPer1000: (cost / mine.length) * 1000,
     totalCost: cost,
     unpricedCalls: ok.filter((r) => !r.priced).length,
+    retriedCalls: mine.filter((r) => (r.attempts ?? 1) > 1).length,
+    // The prompt asks for one JSON object and nothing else. The first decision
+    // found is the one scored, as an automated router would act on it.
+    notPureJson: ok.filter((r) => { try { JSON.parse((r.raw ?? '').trim()); return false; } catch { return true; } }).length,
+    conflictingReplies: ok.filter((r) => new Set([...(r.raw ?? '').matchAll(/"decision"\s*:\s*"(page|ticket|ignore)"/g)].map((m) => m[1])).size > 1).length,
+    emptyReplies: ok.filter((r) => !(r.raw ?? '').trim()).length,
     latencyMs: { p50: quantile(ms, 0.5), p95: quantile(ms, 0.95), max: Math.max(...ms) },
     outputTokens: { p50: quantile(ok.map((r) => r.usage?.out ?? 0), 0.5), reasoningShare: ok.reduce((s, r) => s + (r.usage?.reasoning ?? 0), 0) / (ok.reduce((s, r) => s + (r.usage?.out ?? 0), 0) || 1) },
     served,

@@ -1,0 +1,18 @@
+Which models the account's Serverless Inference key could call, 2026-10-14.
+One request per model ("Say ok", max_tokens 200); HTTP status and error message as returned.
+
+403 openai-gpt-5-nano            this model is not available for your subscription tier
+200 openai-gpt-oss-20b
+200 openai-gpt-oss-120b
+404 deepseek-v4-flash            model not found
+200 deepseek-v4-flash-0731
+200 deepseek-4-flash
+200 qwen3.8-max
+403 anthropic-claude-5.5-haiku   this model is not available for your subscription tier
+403 anthropic-claude-haiku-4.5   this model is not available for your subscription tier
+200 llama-4-maverick
+200 mistral-3-14B
+200 gemma-4-31B-it
+
+The pilot run also returned 403 "this model is not available for your subscription tier"
+for openai-gpt-5-mini and anthropic-claude-sonnet-5.5.
