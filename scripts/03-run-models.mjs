@@ -21,8 +21,6 @@ const LIMIT = Number(arg('limit', 0));
 const BUDGET = Number(arg('budget', 5));
 const CONCURRENCY = Number(arg('concurrency', 4));
 const MODELS = arg('models', [
-  'router:general',
-  'router:software-engineering',
   'openai-gpt-oss-20b',
   'deepseek-v4-flash-0731',
   'mistral-3-14B',
